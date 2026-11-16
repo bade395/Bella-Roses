@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID, randomInt } from "node:crypto";
 import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
@@ -44,6 +44,16 @@ async function appwrite(path: string, init: RequestInit = {}) {
 
 function text(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+async function createOrderNumber() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = `BELLA-${randomInt(100000, 1000000)}`;
+    const existing = await appwrite(`/tablesdb/${DATABASE_ID}/tables/orders/rows?${queryParam({ method: "equal", attribute: "order_number", values: [candidate] })}&${queryParam({ method: "limit", values: [1] })}`);
+    if (!existing.response.ok) throw new Error("ORDER_NUMBER_CHECK");
+    if (!Array.isArray(existing.payload.rows) || existing.payload.rows.length === 0) return candidate;
+  }
+  throw new Error("ORDER_NUMBER_GENERATION");
 }
 
 export async function POST(request: Request) {
@@ -114,7 +124,7 @@ export async function POST(request: Request) {
     }
 
     const orderId = randomUUID();
-    const orderNumber = `BR-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
+    const orderNumber = await createOrderNumber();
     const itemRows = products.map((entry) => {
       const { product, quantity, notes } = entry!;
       const unitPrice = Math.round(Number(product.price) * 100) / 100;
