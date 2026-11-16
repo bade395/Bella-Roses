@@ -291,3 +291,31 @@ a { color: inherit; text-decoration: none; }
 .admin-table-url{overflow-wrap:anywhere;margin:12px 0 0;color:#a18f92;font:9px 'DM Sans',sans-serif}
 @media(max-width:520px){.table-context-banner{width:calc(100% - 36px)}.admin-tables-page{margin-top:38px}.admin-table-card-actions button{flex:1}}
 @media print{.admin-dashboard-header,.admin-tables-page>.admin-auth-eyebrow,.admin-tables-page>h1,.admin-tables-page>p,.admin-table-create,.admin-tables-heading,.admin-table-card-actions,.admin-table-url,.admin-notice,.admin-error-banner{display:none!important}.admin-dashboard,.admin-dashboard-content{margin:0!important;padding:0!important;background:#fff!important}.admin-tables-grid{grid-template-columns:repeat(2,1fr)}.admin-table-card{opacity:1!important;border:1px solid #ddd;page-break-inside:avoid}}
+
+/* Guest table ordering */
+.product-card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px}
+.add-to-cart-button{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid #d9b9bf;background:#fbf3f2;color:#754554;cursor:pointer;font:600 11px 'Tajawal',sans-serif;white-space:nowrap}
+.add-to-cart-button span{font-size:16px;line-height:1}
+.cart-floating-button{position:fixed;z-index:30;bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;min-width:min(420px,calc(100% - 28px));justify-content:space-between;padding:13px 18px;border:0;background:#49333b;color:#fff;box-shadow:0 12px 36px #392b3140;cursor:pointer;font-family:'Tajawal',sans-serif}
+.cart-floating-button span{font-size:13px}.cart-floating-button strong{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#d9a4ad;color:#3b2c31;font:600 12px 'DM Sans',sans-serif}.cart-floating-button b{font:600 13px 'DM Sans',sans-serif}
+.cart-backdrop{position:fixed;z-index:50;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:18px;background:#21191db8;backdrop-filter:blur(3px)}
+.cart-panel{width:min(100%,560px);max-height:min(88vh,820px);overflow:auto;padding:26px;background:#fffdfa;border:1px solid #eadbd8;box-shadow:0 24px 90px #21191d55}
+.cart-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid #eee5df}
+.cart-panel-heading .eyebrow{margin:0 0 8px;font-size:8px}.cart-panel-heading h2{margin:0;color:#49343b;font-size:24px;font-weight:500}
+.cart-panel-heading>button{width:34px;height:34px;border:1px solid #e8dcd8;background:transparent;color:#805c67;font-size:24px;cursor:pointer}
+.cart-form{display:grid;gap:16px;padding-top:18px}.cart-lines{display:grid;gap:12px}
+.cart-line{padding:14px 0;border-bottom:1px solid #f0e7e3}
+.cart-line-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;color:#4b3a40;font-size:13px}
+.cart-line-top>div{display:grid;gap:4px}.cart-line-top small{color:#a18e92;font-size:10px}.cart-line-top>strong{white-space:nowrap;color:#754554;font:600 12px 'DM Sans',sans-serif}
+.cart-line-controls{display:flex;align-items:center;justify-content:space-between;margin:10px 0}
+.quantity-control{display:flex;align-items:center;gap:12px}.quantity-control button{width:29px;height:29px;border:1px solid #e3d0d1;background:#fbf4f2;color:#754554;cursor:pointer}.quantity-control span{min-width:14px;text-align:center;color:#49343b;font:600 13px 'DM Sans',sans-serif}
+.remove-cart-line{border:0;background:transparent;color:#a35c69;font:11px 'Tajawal',sans-serif;cursor:pointer}
+.cart-item-note,.cart-field input,.cart-field textarea{width:100%;padding:10px 12px;border:1px solid #eadfda;background:#fff;color:#49343b;outline:0;font:12px 'Tajawal',sans-serif}
+.cart-field{display:grid;gap:7px;color:#79666b;font-size:12px}.cart-field textarea{resize:vertical}
+.cart-total-row{display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #e9ddda;color:#665158;font-size:14px}.cart-total-row strong{color:#754554;font:600 19px 'DM Sans',sans-serif}
+.cart-payment-note{margin:-8px 0 0;color:#a18e92;font-size:11px}
+.cart-submit-button{min-height:48px;border:0;background:#754554;color:#fff;cursor:pointer;font:600 14px 'Tajawal',sans-serif}.cart-submit-button:disabled{opacity:.6;cursor:wait}
+.cart-error{margin:0;padding:10px 12px;background:#faeeee;color:#9e4050;font-size:12px}
+.cart-empty{padding:45px 12px;text-align:center;color:#9a888b;font-size:13px}
+.order-success{display:grid;justify-items:center;gap:12px;padding:42px 12px;text-align:center}.order-success>span{color:#bd8190;font-size:42px}.order-success p{margin:0;color:#725c63;font-size:15px}.order-success>strong{padding:9px 14px;background:#f7eeec;color:#754554;font:600 18px 'DM Sans',sans-serif;letter-spacing:.04em}.order-success small{color:#978589;font-size:12px}.order-success .cart-submit-button{width:100%;margin-top:10px}
+@media(max-width:520px){.cart-panel{padding:20px 16px}.cart-backdrop{padding:0}.cart-panel{max-height:92vh}.product-card-footer{align-items:flex-start;flex-direction:column}.add-to-cart-button{width:100%;justify-content:center}.cart-floating-button{bottom:12px}}
