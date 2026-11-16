@@ -259,7 +259,7 @@ export default function AdminHomePage() {
   return <main className="admin-dashboard">
     <header className="admin-dashboard-header">
       <Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link>
-      <div className="admin-header-actions"><span className="admin-user-email">{user.email}</span><Link className="admin-tables-link" href="/admin/tables">إدارة الطاولات و QR</Link><button onClick={logout} className="admin-logout">تسجيل الخروج</button></div>
+      <div className="admin-header-actions"><span className="admin-user-email">{user.email}</span><Link className="admin-tables-link" href="/admin/orders">إدارة الطلبات</Link><Link className="admin-tables-link" href="/admin/tables">إدارة الطاولات و QR</Link><button onClick={logout} className="admin-logout">تسجيل الخروج</button></div>
     </header>
     <section className="admin-dashboard-content admin-menu-content">
       <p className="admin-auth-eyebrow">BELLA ROSES CONTROL CENTER</p>
