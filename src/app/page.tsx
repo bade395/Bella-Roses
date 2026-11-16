@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Query, type Models } from "appwrite";
 import {
   APPWRITE_DATABASE_ID,
@@ -101,14 +102,14 @@ export default function Home() {
       </div>
 
       <header className="site-header">
-        <a className="brand-lockup" href="/" aria-label="Bella Roses الرئيسية">
+        <Link className="brand-lockup" href="/" aria-label="Bella Roses الرئيسية">
           <span className="brand-mark" aria-hidden="true">B</span>
           <span className="brand-name">
             <strong>BELLA ROSES</strong>
             <small>THE ART OF HOSPITALITY</small>
           </span>
-        </a>
-        <a className="header-action" href="#menu">استكشف القائمة <span aria-hidden="true">↙</span></a>
+        </Link>
+        <Link className="header-action" href="#menu">استكشف القائمة <span aria-hidden="true">↙</span></Link>
       </header>
 
       <section className="hero-section">
@@ -119,7 +120,7 @@ export default function Home() {
             في بيلا روز، نؤمن أن التفاصيل الصغيرة تصنع فرقًا كبيرًا.
             اكتشف قائمتنا واستمتع بتجربة ضيافة صُممت لتبهج حواسك.
           </p>
-          <a className="primary-link" href="#menu">تصفّح القائمة <span aria-hidden="true">←</span></a>
+          <Link className="primary-link" href="#menu">تصفّح القائمة <span aria-hidden="true">←</span></Link>
         </div>
         <div className="hero-art" aria-label="تصميم زخرفي مستوحى من الورود" role="img">
           <div className="art-orbit orbit-one" />
@@ -226,7 +227,7 @@ export default function Home() {
       </section>
 
       <footer className="site-footer">
-        <a className="footer-brand" href="/">BELLA ROSES<span>✿</span></a>
+        <Link className="footer-brand" href="/">BELLA ROSES<span>✿</span></Link>
         <p>كل لحظة جميلة تبدأ بتفصيلة.</p>
         <span className="footer-copy">© {new Date().getFullYear()} BELLA ROSES. ALL RIGHTS RESERVED.</span>
       </footer>
