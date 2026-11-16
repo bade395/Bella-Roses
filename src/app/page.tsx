@@ -19,6 +19,8 @@ type CategoryRow = Models.Row & {
   sort_order?: number;
 };
 
+type CartLine = { product: ProductRow; quantity: number; notes: string };
+
 type ProductRow = Models.Row & {
   $id: string;
   category_id: string;
@@ -40,6 +42,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tableContext, setTableContext] = useState<{ table_number: number; label: string } | null>(null);
+  const [tableToken, setTableToken] = useState("");
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [orderMessage, setOrderMessage] = useState<{ order_number: string; subtotal: number; table_number: number } | null>(null);
+  const [orderError, setOrderError] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -85,6 +95,7 @@ export default function Home() {
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("table");
     if (!token) return;
+    setTableToken(token);
     let active = true;
     fetch(`/api/table/resolve?token=${encodeURIComponent(token)}`, { cache: "no-store" })
       .then(async (response) => {
@@ -95,6 +106,55 @@ export default function Home() {
       .catch(() => { if (active) setTableContext(null); });
     return () => { active = false; };
   }, []);
+
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+  function addToCart(product: ProductRow) {
+    setCart((current) => {
+      const existing = current.find((item) => item.product.$id === product.$id);
+      if (existing) return current.map((item) => item.product.$id === product.$id ? { ...item, quantity: Math.min(20, item.quantity + 1) } : item);
+      return [...current, { product, quantity: 1, notes: "" }];
+    });
+    setOrderError("");
+  }
+
+  function updateCartLine(productId: string, update: Partial<Pick<CartLine, "quantity" | "notes">>) {
+    setCart((current) => current.flatMap((item) => {
+      if (item.product.$id !== productId) return [item];
+      const next = { ...item, ...update };
+      return next.quantity <= 0 ? [] : [{ ...next, quantity: Math.min(20, next.quantity) }];
+    }));
+  }
+
+  async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!tableToken || cart.length === 0 || submitting) return;
+    setSubmitting(true);
+    setOrderError("");
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          table_token: tableToken,
+          customer_name: customerName,
+          notes: orderNotes,
+          items: cart.map((item) => ({ product_id: item.product.$id, quantity: item.quantity, notes: item.notes })),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "تعذّر تسجيل الطلب.");
+      setOrderMessage(result.order);
+      setCart([]);
+      setCustomerName("");
+      setOrderNotes("");
+    } catch (cause) {
+      setOrderError(cause instanceof Error ? cause.message : "تعذّر تسجيل الطلب.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const visibleProducts = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("ar");
@@ -246,13 +306,72 @@ export default function Home() {
                     {product.name_en ? <p className="product-en">{product.name_en}</p> : null}
                     {product.description_ar ? <p className="product-description">{product.description_ar}</p> : null}
                   </div>
-                  <strong className="product-price">{product.price.toFixed(2)} <small>ر.س</small></strong>
+                  <div className="product-card-footer">
+                    <strong className="product-price">{product.price.toFixed(2)} <small>ر.س</small></strong>
+                    {tableContext ? <button className="add-to-cart-button" type="button" onClick={() => addToCart(product)}>أضف للطلب <span>＋</span></button> : null}
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         )}
       </section>
+
+      {tableContext ? (
+        <>
+          <button className="cart-floating-button" type="button" onClick={() => { setOrderMessage(null); setCartOpen(true); }}>
+            <span>عرض الطلب</span><strong>{cartCount}</strong><b>{cartTotal.toFixed(2)} ر.س</b>
+          </button>
+          {cartOpen ? (
+            <div className="cart-backdrop" role="presentation" onClick={() => setCartOpen(false)}>
+              <section className="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cart-title" onClick={(event) => event.stopPropagation()}>
+                <div className="cart-panel-heading">
+                  <div><p className="eyebrow"><span /> BELLA ROSES</p><h2 id="cart-title">{orderMessage ? "تم استلام طلبك" : "طلبك من بيلا روز"}</h2></div>
+                  <button type="button" aria-label="إغلاق" onClick={() => setCartOpen(false)}>×</button>
+                </div>
+                {orderMessage ? (
+                  <div className="order-success">
+                    <span>✿</span><p>وصل طلبك للمطعم بنجاح.</p>
+                    <strong>{orderMessage.order_number}</strong>
+                    <small>الطاولة {orderMessage.table_number} · {orderMessage.subtotal.toFixed(2)} ر.س</small>
+                    <button className="cart-submit-button" type="button" onClick={() => { setOrderMessage(null); setCartOpen(false); }}>العودة للقائمة</button>
+                  </div>
+                ) : cart.length === 0 ? (
+                  <div className="cart-empty">سلتك فارغة حاليًا. أضف اختياراتك من القائمة.</div>
+                ) : (
+                  <form className="cart-form" onSubmit={submitOrder}>
+                    <div className="cart-lines">
+                      {cart.map((item) => (
+                        <article className="cart-line" key={item.product.$id}>
+                          <div className="cart-line-top">
+                            <div><strong>{item.product.name_ar}</strong><small>{item.product.price.toFixed(2)} ر.س للوحدة</small></div>
+                            <strong>{(item.product.price * item.quantity).toFixed(2)} ر.س</strong>
+                          </div>
+                          <div className="cart-line-controls">
+                            <div className="quantity-control">
+                              <button type="button" aria-label="زيادة الكمية" onClick={() => updateCartLine(item.product.$id, { quantity: item.quantity + 1 })}>＋</button>
+                              <span>{item.quantity}</span>
+                              <button type="button" aria-label="تقليل الكمية" onClick={() => updateCartLine(item.product.$id, { quantity: item.quantity - 1 })}>−</button>
+                            </div>
+                            <button className="remove-cart-line" type="button" onClick={() => updateCartLine(item.product.$id, { quantity: 0 })}>حذف</button>
+                          </div>
+                          <input className="cart-item-note" maxLength={500} placeholder="ملاحظة لهذا الصنف (اختياري)" value={item.notes} onChange={(event) => updateCartLine(item.product.$id, { notes: event.target.value })} />
+                        </article>
+                      ))}
+                    </div>
+                    <label className="cart-field">الاسم (اختياري)<input maxLength={120} value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="اسمك" /></label>
+                    <label className="cart-field">ملاحظات الطلب<textarea maxLength={1500} rows={2} value={orderNotes} onChange={(event) => setOrderNotes(event.target.value)} placeholder="أي تفاصيل إضافية..." /></label>
+                    {orderError ? <p className="cart-error" role="alert">{orderError}</p> : null}
+                    <div className="cart-total-row"><span>الإجمالي</span><strong>{cartTotal.toFixed(2)} ر.س</strong></div>
+                    <p className="cart-payment-note">الدفع غير متاح إلكترونيًا حاليًا؛ يتم الدفع لدى المطعم.</p>
+                    <button className="cart-submit-button" type="submit" disabled={submitting}>{submitting ? "جارٍ إرسال الطلب..." : "تأكيد الطلب"}</button>
+                  </form>
+                )}
+              </section>
+            </div>
+          ) : null}
+        </>
+      ) : null}
 
       <footer className="site-footer">
         <Link className="footer-brand" href="/">BELLA ROSES<span>✿</span></Link>
