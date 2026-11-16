@@ -99,8 +99,6 @@ export default function AdminOrdersPage() {
     let active = true;
     let realtime: Realtime | null = null;
     let subscription: { unsubscribe: () => Promise<void> } | null = null;
-    let refreshTimer: ReturnType<typeof setInterval> | undefined;
-    let pollTimer: ReturnType<typeof setInterval> | undefined;
 
     const connect = async () => {
       try {
@@ -122,8 +120,8 @@ export default function AdminOrdersPage() {
     };
 
     void connect();
-    refreshTimer = setInterval(() => { void connect(); }, 10 * 60 * 1000);
-    pollTimer = setInterval(() => { void load(true); }, 30 * 1000);
+    const refreshTimer = setInterval(() => { void connect(); }, 10 * 60 * 1000);
+    const pollTimer = setInterval(() => { void load(true); }, 30 * 1000);
     return () => {
       active = false;
       if (refreshTimer) clearInterval(refreshTimer);
