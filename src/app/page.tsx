@@ -39,6 +39,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [tableContext, setTableContext] = useState<{ table_number: number; label: string } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -79,6 +80,20 @@ export default function Home() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("table");
+    if (!token) return;
+    let active = true;
+    fetch(`/api/table/resolve?token=${encodeURIComponent(token)}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("رمز الطاولة غير صالح.");
+        return response.json() as Promise<{ table: { table_number: number; label: string } }>;
+      })
+      .then((result) => { if (active) setTableContext(result.table); })
+      .catch(() => { if (active) setTableContext(null); });
+    return () => { active = false; };
   }, []);
 
   const visibleProducts = useMemo(() => {
