@@ -7,12 +7,12 @@ Luxury digital menu and smart restaurant management system.
 - Next.js App Router
 - TypeScript (strict mode)
 - Tailwind CSS
-- Appwrite Cloud (backend services)
-- Vercel (planned hosting)
+- Appwrite Cloud TablesDB, Storage and Auth
+- Vercel hosting
 
 ## Requirements
 
-- Node.js 20.9+
+- Node.js 24+
 - npm
 
 ## Getting started
@@ -24,12 +24,33 @@ Luxury digital menu and smart restaurant management system.
    npm install
    ```
 
-3. Copy `.env.example` to `.env.local` and confirm the Appwrite endpoint and project ID.
+3. Copy `.env.example` to `.env.local` and confirm the Appwrite settings.
 4. Start the development server:
 
    ```bash
    npm run dev
    ```
+
+## Appwrite resources
+
+Project: `6afac57c0019b2ee5fa0`
+
+Database: `bella_roses`
+
+Tables:
+
+- `categories` — bilingual menu categories
+- `products` — bilingual products, prices and availability
+- `restaurant_tables` — physical tables and QR tokens
+- `orders` — table orders and workflow status
+- `order_items` — immutable product snapshots per order
+- `restaurant_settings` — restaurant identity and operational settings
+
+Storage bucket: `menu_images` — public read-only menu and branding images.
+
+Public access is read-only for menu categories, products and menu images. Order, table and settings data remain private by default. Never expose Appwrite API keys in browser code; privileged order creation and administration must be enforced server-side.
+
+Payment processing is intentionally out of scope for this phase.
 
 ## Available checks
 
@@ -54,10 +75,8 @@ src/
 - Never commit `.env.local` or credentials.
 - Never expose Appwrite API keys in browser code.
 - Use server-side code for privileged operations.
-- Configure Appwrite platform hostnames for deployed domains before production.
+- The Appwrite web platform is restricted to the production hostname.
 
 ## Current scope
 
-This repository contains the initial application foundation only. Restaurant data models,
-menu management, table ordering, staff dashboard, and production integrations are planned
-for subsequent implementation phases.
+The initial Next.js foundation is deployed. The Appwrite data foundation is provisioned; menu management, QR table flow, order processing and staff dashboard are the next implementation tasks.
