@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 
-export const APPWRITE_ENDPOINT =
-  process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT;
+export const APPWRITE_ENDPOINT = (
+  process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? ""
+).replace(/\/+$/, "");
 export const APPWRITE_PROJECT_ID =
   process.env.APPWRITE_PROJECT_ID ?? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
 
