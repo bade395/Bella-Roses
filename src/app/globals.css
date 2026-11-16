@@ -266,3 +266,28 @@ a { color: inherit; text-decoration: none; }
 .admin-image-preview img{pointer-events:none}
 .admin-crop-grid{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,transparent 33.15%,#fff9 33.33%,transparent 33.5%,transparent 66.48%,#fff9 66.66%,transparent 66.84%),linear-gradient(to bottom,transparent 33.15%,#fff9 33.33%,transparent 33.5%,transparent 66.48%,#fff9 66.66%,transparent 66.84%);box-shadow:inset 0 0 0 2px #fff9}
 .admin-crop-hint{position:absolute;right:10px;bottom:10px;padding:6px 10px;background:#30272acc;color:#fff;font-size:10px;pointer-events:none}
+
+/* Restaurant table QR management */
+.table-context-banner{width:min(1180px,calc(100% - 64px));margin:16px auto 0;padding:12px 18px;border:1px solid #dfc5c9;background:#f7ecec;color:#75505a;text-align:center;font-size:13px}
+.table-context-banner strong{margin:0 4px;color:#663b49}
+.admin-tables-link{padding:9px 13px;border:1px solid #ddc7c8;color:var(--rose-dark);font-size:12px}
+.admin-tables-page{margin-top:54px}
+.admin-tables-page>h1{margin-bottom:8px}
+.admin-table-create h2,.admin-tables-heading h2{margin:0 0 18px;color:#4c3940;font-size:19px;font-weight:500}
+.admin-tables-heading{display:flex;align-items:center;justify-content:space-between;margin:34px 0 16px}
+.admin-tables-heading h2{margin:0}
+.admin-tables-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+.admin-table-card{padding:18px;border:1px solid #eadbd8;background:var(--paper);break-inside:avoid}
+.admin-table-card.inactive{opacity:.7}
+.admin-table-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.admin-table-card-heading>div{display:grid;gap:5px}
+.admin-table-card-heading strong{color:#4c3940;font-size:18px}
+.admin-table-card-heading small{color:#9a8589;font-size:11px}
+.admin-table-qr{display:grid;justify-items:center;gap:8px;padding:18px 0}
+.admin-table-qr svg{max-width:100%;height:auto;background:#fff}
+.admin-table-qr small{color:#9a8589;font-size:10px}
+.admin-table-card-actions{display:flex;flex-wrap:wrap;gap:7px}
+.admin-table-card-actions button{padding:7px 9px;border:1px solid #e5d5d4;background:transparent;color:#855765;cursor:pointer;font:11px 'Tajawal',sans-serif}
+.admin-table-url{overflow-wrap:anywhere;margin:12px 0 0;color:#a18f92;font:9px 'DM Sans',sans-serif}
+@media(max-width:520px){.table-context-banner{width:calc(100% - 36px)}.admin-tables-page{margin-top:38px}.admin-table-card-actions button{flex:1}}
+@media print{.admin-dashboard-header,.admin-tables-page>.admin-auth-eyebrow,.admin-tables-page>h1,.admin-tables-page>p,.admin-table-create,.admin-tables-heading,.admin-table-card-actions,.admin-table-url,.admin-notice,.admin-error-banner{display:none!important}.admin-dashboard,.admin-dashboard-content{margin:0!important;padding:0!important;background:#fff!important}.admin-tables-grid{grid-template-columns:repeat(2,1fr)}.admin-table-card{opacity:1!important;border:1px solid #ddd;page-break-inside:avoid}}
