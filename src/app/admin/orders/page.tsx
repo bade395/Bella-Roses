@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Realtime } from "appwrite";
+import { Channel, Realtime } from "appwrite";
 import { appwriteClient, APPWRITE_DATABASE_ID } from "@/lib/appwrite";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -110,7 +110,7 @@ export default function AdminOrdersPage() {
         if (subscription) await subscription.unsubscribe().catch(() => undefined);
         realtime = new Realtime(appwriteClient);
         subscription = await realtime.subscribe(
-          ["tablesdb." + APPWRITE_DATABASE_ID + ".tables.orders.rows"],
+          Channel.tablesdb(APPWRITE_DATABASE_ID).table("orders").row(),
           () => { if (active) void load(true); },
         );
         if (active) setLiveStatus("connected");
