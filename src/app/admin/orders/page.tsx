@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Realtime } from "appwrite";
+import { appwriteClient, APPWRITE_DATABASE_ID } from "@/lib/appwrite";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -30,21 +32,108 @@ export default function AdminOrdersPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<"connecting" | "connected" | "fallback">("connecting");
+  const audioContext = useRef<AudioContext | null>(null);
+  const knownOrderIds = useRef<Set<string>>(new Set());
+  const initialLoadComplete = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
+  const playAlert = useCallback(() => {
+    const context = audioContext.current;
+    if (!soundEnabled || !context || context.state !== "running") return;
+    const now = context.currentTime;
+    [880, 660].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, now + index * 0.22);
+      gain.gain.setValueAtTime(0.0001, now + index * 0.22);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + index * 0.22 + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.22 + 0.18);
+      oscillator.connect(gain); gain.connect(context.destination);
+      oscillator.start(now + index * 0.22); oscillator.stop(now + index * 0.22 + 0.19);
+    });
+  }, [soundEnabled]);
+
+  function enableSound() {
+    try {
+      const Context = window.AudioContext;
+      if (!Context) return;
+      if (!audioContext.current) audioContext.current = new Context();
+      void audioContext.current.resume().then(() => {
+        setSoundEnabled(true);
+        const ctx = audioContext.current;
+        if (!ctx) return;
+        const oscillator = ctx.createOscillator(); const gain = ctx.createGain();
+        oscillator.frequency.value = 740; gain.gain.value = 0.12;
+        oscillator.connect(gain); gain.connect(ctx.destination);
+        oscillator.start(); oscillator.stop(ctx.currentTime + 0.12);
+      });
+    } catch { setError("المتصفح لا يدعم التنبيه الصوتي."); }
+  }
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true); setError("");
     try {
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
       if (response.status === 401) { router.replace("/admin/login"); return; }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "تعذّر تحميل الطلبات.");
-      setOrders(data.orders ?? []); setTables(data.tables ?? []);
+      const nextOrders = (data.orders ?? []) as Order[];
+      if (initialLoadComplete.current) {
+        const incoming = nextOrders.filter((order) => order.status === "new" && !knownOrderIds.current.has(order.$id));
+        if (incoming.length) playAlert();
+      }
+      nextOrders.forEach((order) => knownOrderIds.current.add(order.$id));
+      initialLoadComplete.current = true;
+      setOrders(nextOrders); setTables(data.tables ?? []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "حدث خطأ أثناء تحميل الطلبات.");
-    } finally { setLoading(false); }
-  }, [router]);
+    } finally { if (!silent) setLoading(false); }
+  }, [router, playAlert]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!appwriteClient) { setLiveStatus("fallback"); return; }
+    let active = true;
+    let realtime: Realtime | null = null;
+    let subscription: { unsubscribe: () => Promise<void> } | null = null;
+    let refreshTimer: ReturnType<typeof setInterval> | undefined;
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+    const connect = async () => {
+      try {
+        const tokenResponse = await fetch("/api/admin/realtime-token", { cache: "no-store" });
+        const tokenData = await tokenResponse.json();
+        if (!tokenResponse.ok || !tokenData.jwt) throw new Error("JWT");
+        if (!active) return;
+        appwriteClient.setJWT(tokenData.jwt as string);
+        if (subscription) await subscription.unsubscribe().catch(() => undefined);
+        realtime = new Realtime(appwriteClient);
+        subscription = await realtime.subscribe(
+          ["tablesdb." + APPWRITE_DATABASE_ID + ".tables.orders.rows"],
+          () => { if (active) void load(true); },
+        );
+        if (active) setLiveStatus("connected");
+      } catch {
+        if (active) setLiveStatus("fallback");
+      }
+    };
+
+    void connect();
+    refreshTimer = setInterval(() => { void connect(); }, 10 * 60 * 1000);
+    pollTimer = setInterval(() => { void load(true); }, 30 * 1000);
+    return () => {
+      active = false;
+      if (refreshTimer) clearInterval(refreshTimer);
+      if (pollTimer) clearInterval(pollTimer);
+      if (subscription) void subscription.unsubscribe().catch(() => undefined);
+      if (realtime) void realtime.disconnect().catch(() => undefined);
+      appwriteClient?.setJWT("");
+      if (audioContext.current) void audioContext.current.close();
+    };
+  }, [load]);
 
   async function openOrder(id: string) {
     setSelected(id); setDetailLoading(true); setItems([]); setError("");
@@ -92,7 +181,10 @@ export default function AdminOrdersPage() {
           <div><span>قيد التحضير</span><strong>{orders.filter((order) => order.status === "preparing").length}</strong></div>
         </div>
         {error ? <div className="admin-error-banner" role="alert">{error}</div> : null}
-        <div className="admin-list-toolbar"><span>آخر 100 طلب</span><button type="button" onClick={() => void load()}>↻ تحديث</button></div>
+        <div className="admin-list-toolbar">
+          <span>آخر 100 طلب · <small className={liveStatus === "connected" ? "orders-live-connected" : "orders-live-fallback"}>{liveStatus === "connected" ? "● متصل لحظيًا" : "● تحديث تلقائي احتياطي"}</small></span>
+          <div className="admin-orders-actions"><button type="button" className={soundEnabled ? "orders-sound-enabled" : ""} onClick={enableSound}>{soundEnabled ? "🔔 التنبيه الصوتي مفعّل" : "♬ تفعيل صوت التنبيه"}</button><button type="button" onClick={() => void load()}>↻ تحديث</button></div>
+        </div>
         {loading ? <div className="admin-empty-state">جارٍ تحميل الطلبات...</div> : orders.length === 0 ? (
           <div className="admin-empty-state">لا توجد طلبات حتى الآن. ستظهر هنا الطلبات التي يرسلها العملاء من الطاولات.</div>
         ) : (
