@@ -214,7 +214,7 @@ export default function Home() {
                 <div className="product-placeholder">
                   {product.image_id ? (
                     <Image
-                      src={`${process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT}/storage/buckets/menu_images/files/${encodeURIComponent(product.image_id)}/preview?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}`}
+                      src={`${process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT}/storage/buckets/menu_images/files/${encodeURIComponent(product.image_id)}/view?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}`}
                       alt={product.name_ar}
                       fill
                       sizes="(max-width: 420px) 100vw, (max-width: 760px) 50vw, 33vw"
