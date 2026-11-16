@@ -8,19 +8,44 @@ import {
 
 export const runtime = "nodejs";
 
-function readCookieValue(setCookies: string[], name: string) {
-  for (const cookie of setCookies) {
-    const pair = cookie.split(";", 1)[0];
-    const separator = pair.indexOf("=");
-    if (separator > 0 && pair.slice(0, separator).trim() === name) {
-      return pair.slice(separator + 1);
+function readCookieValue(setCookies: string[], names: string[]) {
+  for (const name of names) {
+    for (const cookie of setCookies) {
+      const pair = cookie.split(";", 1)[0];
+      const separator = pair.indexOf("=");
+      if (separator > 0 && pair.slice(0, separator).trim() === name) {
+        return pair.slice(separator + 1);
+      }
     }
   }
   return undefined;
 }
 
+function getAppwriteSessionSecret(headers: Headers, projectId: string) {
+  const names = [
+    `a_session_${projectId}`,
+    `a_session_${projectId}_legacy`,
+  ];
+  const extendedHeaders = headers as Headers & { getSetCookie?: () => string[] };
+  const setCookies = extendedHeaders.getSetCookie?.() ?? [];
+  const directValue = readCookieValue(setCookies, names);
+  if (directValue) return directValue;
+
+  // Some fetch implementations expose Set-Cookie only as a combined header.
+  const combined = headers.get("set-cookie");
+  if (!combined) return undefined;
+
+  for (const name of names) {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = combined.match(new RegExp(`(?:^|,)\\s*${escapedName}=([^;,\\s]+)`));
+    if (match?.[1]) return match[1];
+  }
+  return undefined;
+}
+
 export async function POST(request: Request) {
-  if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !ADMIN_SESSION_COOKIE) {
+  const apiKey = process.env.APPWRITE_API_KEY;
+  if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !ADMIN_SESSION_COOKIE || !apiKey) {
     return NextResponse.json({ error: "Server authentication is not configured." }, { status: 503 });
   }
 
@@ -49,17 +74,24 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+        "X-Appwrite-Key": apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
       cache: "no-store",
+      redirect: "manual",
     });
   } catch {
     return NextResponse.json({ error: "تعذّر الاتصال بخدمة تسجيل الدخول. حاول لاحقًا." }, { status: 502 });
   }
 
   if (!loginResponse.ok) {
-    return NextResponse.json({ error: "تعذّر تسجيل الدخول. راجع بياناتك وحاول مرة أخرى." }, { status: 401 });
+    const errorType = loginResponse.headers.get("x-appwrite-error-type") ?? "unknown";
+    console.error("Appwrite admin login rejected", {
+      status: loginResponse.status,
+      errorType,
+    });
+    return NextResponse.json({ error: "تعذّر تسجيل الدخول. راجع بياناتك أو إعدادات المصادقة." }, { status: 401 });
   }
 
   const session = (await loginResponse.json().catch(() => ({}))) as {
@@ -67,14 +99,22 @@ export async function POST(request: Request) {
     expire?: string;
   };
 
-  // Appwrite REST may return the session secret in Set-Cookie rather than JSON.
-  const appwriteCookies = loginResponse.headers.getSetCookie();
   const sessionSecret =
     session.secret ??
-    readCookieValue(appwriteCookies, ADMIN_SESSION_COOKIE);
+    getAppwriteSessionSecret(loginResponse.headers, APPWRITE_PROJECT_ID);
 
   if (!sessionSecret) {
-    return NextResponse.json({ error: "استجاب Appwrite دون إرجاع بيانات الجلسة المطلوبة. راجع إعدادات المصادقة." }, { status: 502 });
+    const extendedHeaders = loginResponse.headers as Headers & { getSetCookie?: () => string[] };
+    const setCookies = extendedHeaders.getSetCookie?.() ?? [];
+    console.error("Appwrite admin login returned no session secret", {
+      status: loginResponse.status,
+      contentType: loginResponse.headers.get("content-type"),
+      responseFormat: loginResponse.headers.get("x-appwrite-response-format"),
+      cookieNames: setCookies.map((cookie) => cookie.split(";", 1)[0]?.split("=", 1)[0]).filter(Boolean),
+      hasCombinedSetCookie: Boolean(loginResponse.headers.get("set-cookie")),
+      responseKeys: Object.keys(session),
+    });
+    return NextResponse.json({ error: "نجح الاتصال بـ Appwrite لكن لم تصل بيانات الجلسة. راجع سجلات الخادم." }, { status: 502 });
   }
 
   let userResponse: Response;
