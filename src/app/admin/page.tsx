@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -51,6 +51,7 @@ export default function AdminHomePage() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [cropX, setCropX] = useState(50);
   const [cropY, setCropY] = useState(50);
+  const cropDrag = useRef<{ pointerId: number; startX: number; startY: number; cropX: number; cropY: number } | null>(null);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -139,6 +140,24 @@ export default function AdminHomePage() {
       is_featured: item.is_featured === true, sort_order: item.sort_order ?? 0,
     });
     setImageFile(null); setCropX(50); setCropY(50); setShowForm(true); setError(""); setNotice("");
+  }
+
+  function startCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (!imagePreviewUrl || event.button !== 0) return;
+    cropDrag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, cropX, cropY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = cropDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setCropX(Math.max(0, Math.min(100, drag.cropX - ((event.clientX - drag.startX) / bounds.width) * 100)));
+    setCropY(Math.max(0, Math.min(100, drag.cropY - ((event.clientY - drag.startY) / bounds.height) * 100)));
+  }
+
+  function endCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (cropDrag.current?.pointerId === event.pointerId) cropDrag.current = null;
   }
 
   async function uploadImage() {
@@ -284,10 +303,10 @@ export default function AdminHomePage() {
             <label>الوصف بالإنجليزية<textarea dir="ltr" value={productForm.description_en} onChange={e => setProductForm({ ...productForm, description_en: e.target.value })} /></label>
             <label className="admin-file-label">صورة المنتج<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e => { setImageFile(e.target.files?.[0] ?? null); setCropX(50); setCropY(50); }} /><small>{imageFile ? imageFile.name : productForm.image_id ? "تم ربط صورة بهذا المنتج — اختر ملفًا لاستبدالها" : "JPG / PNG / WebP / AVIF — حتى 5MB"}</small></label>
             {imageFile && imagePreviewUrl ? <div className="admin-image-editor">
-              <div className="admin-image-preview"><img src={imagePreviewUrl} alt="معاينة قص صورة المنتج" style={{ objectFit: "cover", objectPosition: `${cropX}% ${cropY}%` }} /></div>
+              <div className="admin-image-preview" onPointerDown={startCropDrag} onPointerMove={moveCropDrag} onPointerUp={endCropDrag} onPointerCancel={endCropDrag} role="group" aria-label="اسحب الصورة داخل الإطار لضبط القص"><img src={imagePreviewUrl} alt="معاينة مباشرة للصورة بعد القص" draggable={false} style={{ objectFit: "cover", objectPosition: `${cropX}% ${cropY}%` }} /><span className="admin-crop-grid" aria-hidden="true" /><span className="admin-crop-hint">اسحب الصورة لضبط الجزء الظاهر</span></div>
               <div className="admin-image-controls">
                 <strong>ضبط إطار الصورة</strong>
-                <small>المقاس النهائي 1200 × 900 بكسل (4:3). حرّك الصورة لتحديد الجزء الظاهر دون تمديدها.</small>
+                <small>المقاس النهائي 1200 × 900 بكسل (4:3). اسحب الصورة نفسها داخل الإطار أو استخدم المؤشرات لضبط الجزء الظاهر مباشرةً.</small>
                 <label>أفقي <input type="range" min="0" max="100" value={cropX} onChange={e => setCropX(Number(e.target.value))} /></label>
                 <label>رأسي <input type="range" min="0" max="100" value={cropY} onChange={e => setCropY(Number(e.target.value))} /></label>
                 <button type="button" className="admin-secondary-button" onClick={() => { setCropX(50); setCropY(50); }}>إعادة ضبط القص</button>
