@@ -200,3 +200,5 @@ a { color: inherit; text-decoration: none; }
 .admin-coming-soon h2{color:#5c444b;font-size:23px;font-weight:500}
 .admin-coming-soon p{color:#9a888b;font-size:14px}
 @media(max-width:520px){.admin-auth-card{padding:36px 22px}.admin-auth-card h1,.admin-dashboard-content h1{font-size:27px}.admin-dashboard-header{height:72px;padding:0 18px}}
+
+.admin-auth-links{display:flex;justify-content:center;gap:22px;flex-wrap:wrap}.admin-auth-links .admin-auth-subtle{margin-top:20px}
