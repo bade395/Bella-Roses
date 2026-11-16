@@ -48,7 +48,7 @@ export default function Home() {
   const [customerName, setCustomerName] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [orderMessage, setOrderMessage] = useState<{ order_number: string; subtotal: number; table_number: number } | null>(null);
+  const [orderMessage, setOrderMessage] = useState<{ id: string; order_number: string; subtotal: number; table_number: number } | null>(null);
   const [orderError, setOrderError] = useState("");
 
   useEffect(() => {
@@ -334,6 +334,7 @@ export default function Home() {
                     <span>✿</span><p>وصل طلبك للمطعم بنجاح.</p>
                     <strong>{orderMessage.order_number}</strong>
                     <small>الطاولة {orderMessage.table_number} · {orderMessage.subtotal.toFixed(2)} ر.س</small>
+                    <Link className="cart-submit-button track-order-button" href={`/order/${orderMessage.id}`}>تابع حالة طلبك</Link>
                     <button className="cart-submit-button" type="button" onClick={() => { setOrderMessage(null); setCartOpen(false); }}>العودة للقائمة</button>
                   </div>
                 ) : cart.length === 0 ? (
