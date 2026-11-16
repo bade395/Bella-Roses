@@ -119,6 +119,8 @@ export default function Home() {
         <span>أهلًا بك في بيلا روز — حيث تبدأ الحكاية بتفصيلة جميلة</span>
       </div>
 
+      {tableContext ? <div className="table-context-banner" role="status">تم التعرّف على طاولتك <strong>رقم {tableContext.table_number}</strong>{tableContext.label ? ` — ${tableContext.label}` : ""}</div> : null}
+
       <header className="site-header">
         <Link className="brand-lockup" href="/" aria-label="Bella Roses الرئيسية">
           <span className="brand-mark" aria-hidden="true">B</span>
