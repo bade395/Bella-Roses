@@ -19,7 +19,7 @@ async function call(path: string, init: RequestInit = {}) {
     headers: { "X-Appwrite-Project": APPWRITE_PROJECT_ID, "X-Appwrite-Key": key, "Content-Type": "application/json", ...init.headers },
     cache: "no-store",
   });
-  const payload = await response.json().catch(() => ({})) as Record<string, any>;
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
   return { response, payload };
 }
 function q(value: unknown) { return `queries[]=${encodeURIComponent(JSON.stringify(value))}`; }
@@ -36,14 +36,14 @@ export async function GET(request: Request) {
       ]);
       if (!order.response.ok) return fail("الطلب غير موجود.", 404);
       if (!items.response.ok) throw new Error("ITEMS");
-      return NextResponse.json({ order: order.payload, items: items.payload.rows ?? [] }, { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ order: order.payload, items: (items.payload.rows ?? []) as unknown[] }, { headers: { "Cache-Control": "no-store" } });
     }
     const [orders, tables] = await Promise.all([
       call(`/tablesdb/${DB}/tables/orders/rows?${q({ method: "orderDesc", attribute: "$createdAt" })}&${q({ method: "limit", values: [100] })}`),
       call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "limit", values: [100] })}`),
     ]);
     if (!orders.response.ok || !tables.response.ok) throw new Error("LIST");
-    return NextResponse.json({ orders: orders.payload.rows ?? [], tables: tables.payload.rows ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ orders: (orders.payload.rows ?? []) as unknown[], tables: (tables.payload.rows ?? []) as unknown[] }, { headers: { "Cache-Control": "no-store" } });
   } catch (cause) {
     console.error("Admin orders read failed", cause instanceof Error ? cause.message : "unknown");
     return fail("تعذّر تحميل الطلبات.", 502);
