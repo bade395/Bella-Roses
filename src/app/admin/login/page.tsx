@@ -33,7 +33,7 @@ export default function AdminLoginPage() {
       {error&&<p className="admin-auth-error" role="alert">{error}</p>}
       <button type="submit" disabled={busy}>{busy?"جارٍ التحقق...":"تسجيل الدخول"}</button>
     </form>
-    <Link className="admin-auth-subtle" href="/admin/forgot-password">نسيت كلمة المرور؟</Link>
+    <div className="admin-auth-links"><Link className="admin-auth-subtle" href="/admin/forgot-password">نسيت كلمة المرور؟</Link><Link className="admin-auth-subtle" href="/admin/setup">تفعيل حساب المدير لأول مرة</Link></div>
     <p className="admin-auth-foot">دخول مخصص لفريق إدارة Bella Roses</p>
   </section></main>;
 }
