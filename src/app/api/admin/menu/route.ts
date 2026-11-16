@@ -15,7 +15,7 @@ function jsonError(message: string, status = 400) {
 
 async function requireAdmin(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return null;
+  if (!origin || origin !== new URL(request.url).origin) return null;
   return getAdminUser();
 }
 
