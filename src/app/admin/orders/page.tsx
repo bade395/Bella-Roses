@@ -17,8 +17,8 @@ type OrderItem = {
 type Table = { $id: string; table_number: number; label?: string };
 
 const statusLabels: Record<string, string> = {
-  new: "جديد", accepted: "تم القبول", preparing: "قيد التحضير",
-  ready: "جاهز", served: "تم التقديم", cancelled: "ملغي",
+  new: "طلب جديد", accepted: "تم القبول", preparing: "قيد التحضير",
+  ready: "جاهز للاستلام", served: "تم التقديم", cancelled: "ملغي",
 };
 const statuses = ["new", "accepted", "preparing", "ready", "served", "cancelled"];
 
@@ -33,47 +33,35 @@ export default function AdminOrdersPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState("default");
   const [liveStatus, setLiveStatus] = useState<"connecting" | "connected" | "fallback">("connecting");
   const audioContext = useRef<AudioContext | null>(null);
+  const soundEnabledRef = useRef(false);
   const knownOrderIds = useRef<Set<string>>(new Set());
   const initialLoadComplete = useRef(false);
 
   const playAlert = useCallback(() => {
     const context = audioContext.current;
-    if (!soundEnabled || !context || context.state !== "running") return;
+    if (!soundEnabledRef.current || !context || context.state !== "running") return;
     const now = context.currentTime;
-    [880, 660].forEach((frequency, index) => {
+    [880, 660, 880].forEach((frequency, index) => {
+      const start = now + index * 0.24;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, now + index * 0.22);
-      gain.gain.setValueAtTime(0.0001, now + index * 0.22);
-      gain.gain.exponentialRampToValueAtTime(0.16, now + index * 0.22 + 0.025);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.22 + 0.18);
-      oscillator.connect(gain); gain.connect(context.destination);
-      oscillator.start(now + index * 0.22); oscillator.stop(now + index * 0.22 + 0.19);
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.2);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.21);
     });
-  }, [soundEnabled]);
-
-  function enableSound() {
-    try {
-      const Context = window.AudioContext;
-      if (!Context) return;
-      if (!audioContext.current) audioContext.current = new Context();
-      void audioContext.current.resume().then(() => {
-        setSoundEnabled(true);
-        const ctx = audioContext.current;
-        if (!ctx) return;
-        const oscillator = ctx.createOscillator(); const gain = ctx.createGain();
-        oscillator.frequency.value = 740; gain.gain.value = 0.12;
-        oscillator.connect(gain); gain.connect(ctx.destination);
-        oscillator.start(); oscillator.stop(ctx.currentTime + 0.12);
-      });
-    } catch { setError("المتصفح لا يدعم التنبيه الصوتي."); }
-  }
+  }, []);
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true); setError("");
+    if (!silent) setLoading(true);
     try {
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
       if (response.status === 401) { router.replace("/admin/login"); return; }
@@ -82,19 +70,33 @@ export default function AdminOrdersPage() {
       const nextOrders = (data.orders ?? []) as Order[];
       if (initialLoadComplete.current) {
         const incoming = nextOrders.filter((order) => order.status === "new" && !knownOrderIds.current.has(order.$id));
-        if (incoming.length) playAlert();
+        if (incoming.length) {
+          playAlert();
+          if ("Notification" in window && Notification.permission === "granted") {
+            incoming.forEach((order) => new Notification(`طلب جديد ${order.order_number}`, {
+              body: `وصل طلب جديد من طاولة ${data.tables?.find((table: Table) => table.$id === order.table_id)?.table_number ?? "—"}`,
+              tag: order.$id,
+              icon: "/favicon.ico",
+            }));
+          }
+        }
       }
       nextOrders.forEach((order) => knownOrderIds.current.add(order.$id));
       initialLoadComplete.current = true;
-      setOrders(nextOrders); setTables(data.tables ?? []);
+      setOrders(nextOrders);
+      setTables(data.tables ?? []);
+      setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "حدث خطأ أثناء تحميل الطلبات.");
-    } finally { if (!silent) setLoading(false); }
-  }, [router, playAlert]);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [playAlert, router]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
+    if ("Notification" in window) setNotificationPermission(Notification.permission);
     const client = appwriteClient;
     if (!client) { setLiveStatus("fallback"); return; }
     let active = true;
@@ -121,18 +123,40 @@ export default function AdminOrdersPage() {
     };
 
     void connect();
-    const refreshTimer = setInterval(() => { void connect(); }, 10 * 60 * 1000);
-    const pollTimer = setInterval(() => { void load(true); }, 30 * 1000);
+    const refreshTimer = window.setInterval(() => void connect(), 10 * 60 * 1000);
+    const pollTimer = window.setInterval(() => void load(true), 12 * 1000);
     return () => {
       active = false;
-      if (refreshTimer) clearInterval(refreshTimer);
-      if (pollTimer) clearInterval(pollTimer);
+      window.clearInterval(refreshTimer);
+      window.clearInterval(pollTimer);
       if (subscription) void subscription.unsubscribe().catch(() => undefined);
       if (realtime) void realtime.disconnect().catch(() => undefined);
       client.setJWT("");
-      if (audioContext.current) void audioContext.current.close();
     };
   }, [load]);
+
+  useEffect(() => () => {
+    if (audioContext.current) void audioContext.current.close();
+  }, []);
+
+  async function enableAlerts() {
+    try {
+      const Context = window.AudioContext;
+      if (Context) {
+        if (!audioContext.current || audioContext.current.state === "closed") audioContext.current = new Context();
+        await audioContext.current.resume();
+        soundEnabledRef.current = true;
+        setSoundEnabled(true);
+        playAlert();
+      }
+      if ("Notification" in window) {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+      }
+    } catch {
+      setError("تعذّر تفعيل الصوت. تأكد من إعدادات الصوت في المتصفح.");
+    }
+  }
 
   async function openOrder(id: string) {
     setSelected(id); setDetailLoading(true); setItems([]); setError("");
@@ -165,47 +189,58 @@ export default function AdminOrdersPage() {
   const selectedOrder = orders.find((order) => order.$id === selected) ?? null;
 
   return (
-    <main className="admin-dashboard">
+    <main className="admin-dashboard admin-orders-dashboard">
       <header className="admin-dashboard-header">
         <Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link>
-        <div className="admin-header-actions"><Link className="admin-tables-link" href="/admin">إدارة القائمة</Link><Link className="admin-tables-link" href="/admin/tables">الطاولات و QR</Link></div>
+        <div className="admin-header-actions">
+          <Link className="admin-tables-link" href="/admin">إدارة القائمة</Link>
+          <Link className="admin-tables-link" href="/admin/tables">الطاولات و QR</Link>
+          <Link className="admin-tables-link" href="/admin/orders/display">شاشة عرض الكافيه ↗</Link>
+        </div>
       </header>
-      <section className="admin-dashboard-content admin-menu-content">
+      <section className="admin-dashboard-content admin-menu-content admin-orders-content">
         <p className="admin-auth-eyebrow">BELLA ROSES CONTROL CENTER</p>
-        <h1>إدارة الطلبات</h1>
-        <p>تابع الطلبات الواردة من الطاولات وحدّث حالتها لحظة بلحظة.</p>
+        <div className="orders-page-title"><div><h1>مركز متابعة الطلبات</h1><p>كل طلب واضح، وكل تحديث في مكانه.</p></div><span className={liveStatus === "connected" ? "orders-live-connected" : "orders-live-fallback"}>{liveStatus === "connected" ? "● متصل لحظيًا" : "● تحديث تلقائي احتياطي"}</span></div>
         <div className="admin-stats">
           <div><span>كل الطلبات</span><strong>{orders.length}</strong></div>
           <div><span>طلبات جديدة</span><strong>{orders.filter((order) => order.status === "new").length}</strong></div>
-          <div><span>قيد التحضير</span><strong>{orders.filter((order) => order.status === "preparing").length}</strong></div>
+          <div><span>قيد التحضير</span><strong>{orders.filter((order) => ["accepted", "preparing"].includes(order.status)).length}</strong></div>
         </div>
         {error ? <div className="admin-error-banner" role="alert">{error}</div> : null}
-        <div className="admin-list-toolbar">
-          <span>آخر 100 طلب · <small className={liveStatus === "connected" ? "orders-live-connected" : "orders-live-fallback"}>{liveStatus === "connected" ? "● متصل لحظيًا" : "● تحديث تلقائي احتياطي"}</small></span>
-          <div className="admin-orders-actions"><button type="button" className={soundEnabled ? "orders-sound-enabled" : ""} onClick={enableSound}>{soundEnabled ? "🔔 التنبيه الصوتي مفعّل" : "♬ تفعيل صوت التنبيه"}</button><button type="button" onClick={() => void load()}>↻ تحديث</button></div>
+        <div className="orders-control-bar">
+          <div><strong>تنبيهات الطلبات</strong><small>فعّلها مرة واحدة بعد فتح لوحة الإدارة للسماح بالصوت وإشعارات المتصفح.</small></div>
+          <div className="admin-orders-actions">
+            <button type="button" className={soundEnabled ? "orders-sound-enabled" : ""} onClick={() => void enableAlerts()}>{soundEnabled ? "🔔 الصوت مفعّل" : "♬ تفعيل الصوت والإشعارات"}</button>
+            <button type="button" onClick={() => void load()}>↻ تحديث</button>
+          </div>
         </div>
+        {notificationPermission === "denied" ? <p className="orders-permission-note">إشعارات المتصفح محظورة حاليًا. اسمح بها من إعدادات الموقع في المتصفح.</p> : null}
         {loading ? <div className="admin-empty-state">جارٍ تحميل الطلبات...</div> : orders.length === 0 ? (
-          <div className="admin-empty-state">لا توجد طلبات حتى الآن. ستظهر هنا الطلبات التي يرسلها العملاء من الطاولات.</div>
+          <div className="admin-empty-state">لا توجد طلبات حتى الآن.</div>
         ) : (
-          <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>رقم الطلب</th><th>الطاولة</th><th>الوقت</th><th>الإجمالي</th><th>الحالة</th><th>التفاصيل</th></tr></thead>
-            <tbody>{orders.map((order) => {
+          <div className="orders-card-grid">
+            {orders.map((order) => {
               const table = tableMap.get(order.table_id);
-              return <tr key={order.$id}>
-                <td><strong dir="ltr">{order.order_number}</strong>{order.customer_name ? <small className="admin-order-customer">{order.customer_name}</small> : null}</td>
-                <td>{table ? `طاولة ${table.table_number}` : "—"}</td>
-                <td dir="ltr">{new Date(order.$createdAt).toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" })}</td>
-                <td className="admin-price">{Number(order.subtotal).toFixed(2)} ر.س</td>
-                <td><select className="admin-order-status" value={order.status} disabled={saving === order.$id} onChange={(event) => void updateStatus(order, event.target.value)}>{statuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></td>
-                <td><button className="admin-order-detail-button" type="button" onClick={() => void openOrder(order.$id)}>عرض</button></td>
-              </tr>;
-            })}</tbody>
-          </table></div>
+              return <article className={`orders-admin-card status-${order.status}`} key={order.$id}>
+                <div className="orders-admin-card-top"><span className={`orders-status-pill status-${order.status}`}>{statusLabels[order.status] ?? order.status}</span><small>{new Date(order.$createdAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</small></div>
+                <strong className="orders-admin-number" dir="ltr">{order.order_number}</strong>
+                <div className="orders-admin-meta"><span>طاولة {table?.table_number ?? "—"}</span><span>{order.customer_name || "عميل بيلا روز"}</span></div>
+                <div className="orders-admin-total">{Number(order.subtotal).toFixed(2)} <small>ر.س</small></div>
+                <label className="orders-admin-status-control">حالة الطلب
+                  <select className="admin-order-status" value={order.status} disabled={saving === order.$id} onChange={(event) => void updateStatus(order, event.target.value)}>
+                    {statuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+                  </select>
+                </label>
+                <button className="admin-order-detail-button orders-detail-wide" type="button" onClick={() => void openOrder(order.$id)}>عرض تفاصيل الطلب</button>
+              </article>;
+            })}
+          </div>
         )}
-        <p className="admin-data-note">الأسعار المعروضة هي نسخة محفوظة وقت إنشاء الطلب. تغيير سعر المنتج لاحقًا لا يغيّر الطلبات السابقة.</p>
+        <p className="admin-data-note">الطلبات مرتبة من الأحدث إلى الأقدم. شاشة العرض تعرض الطلبات الجديدة وقيد التحضير والجاهزة فقط.</p>
       </section>
       {selectedOrder ? <div className="cart-backdrop admin-order-backdrop" role="presentation" onClick={() => setSelected(null)}>
         <section className="cart-panel admin-order-panel" role="dialog" aria-modal="true" aria-labelledby="order-detail-title" onClick={(event) => event.stopPropagation()}>
-          <div className="cart-panel-heading"><div><p className="eyebrow"><span /> ORDER DETAILS</p><h2 id="order-detail-title">طلب {selectedOrder.order_number}</h2></div><button type="button" onClick={() => setSelected(null)} aria-label="إغلاق">×</button></div>
+          <div className="cart-panel-heading"><div><p className="eyebrow"><span /> ORDER DETAILS</p><h2 id="order-detail-title">{selectedOrder.order_number}</h2></div><button type="button" onClick={() => setSelected(null)} aria-label="إغلاق">×</button></div>
           {detailLoading ? <div className="admin-empty-state">جارٍ تحميل التفاصيل...</div> : <>
             <div className="admin-order-meta"><span>الحالة: {statusLabels[selectedOrder.status] ?? selectedOrder.status}</span><strong>{Number(selectedOrder.subtotal).toFixed(2)} ر.س</strong></div>
             {items.map((item) => <div className="admin-order-item" key={item.$id}><div><strong>{item.product_name_ar}</strong><small>{item.quantity} × {Number(item.unit_price).toFixed(2)} ر.س</small>{item.notes ? <p>ملاحظة: {item.notes}</p> : null}</div><b>{Number(item.line_total).toFixed(2)} ر.س</b></div>)}
