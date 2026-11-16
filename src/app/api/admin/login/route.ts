@@ -8,13 +8,25 @@ import {
 
 export const runtime = "nodejs";
 
+function readCookieValue(setCookies: string[], name: string) {
+  for (const cookie of setCookies) {
+    const pair = cookie.split(";", 1)[0];
+    const separator = pair.indexOf("=");
+    if (separator > 0 && pair.slice(0, separator).trim() === name) {
+      return pair.slice(separator + 1);
+    }
+  }
+  return undefined;
+}
+
 export async function POST(request: Request) {
   if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !ADMIN_SESSION_COOKIE) {
     return NextResponse.json({ error: "Server authentication is not configured." }, { status: 503 });
   }
 
+  const expectedOrigin = new URL(request.url).origin;
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!origin || origin !== expectedOrigin) {
     return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   }
 
@@ -31,39 +43,55 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
 
-  const loginResponse = await fetch(`${APPWRITE_ENDPOINT}/account/sessions/email`, {
-    method: "POST",
-    headers: {
-      "X-Appwrite-Project": APPWRITE_PROJECT_ID,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-    cache: "no-store",
-  });
+  let loginResponse: Response;
+  try {
+    loginResponse = await fetch(`${APPWRITE_ENDPOINT}/account/sessions/email`, {
+      method: "POST",
+      headers: {
+        "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json({ error: "تعذّر الاتصال بخدمة تسجيل الدخول. حاول لاحقًا." }, { status: 502 });
+  }
 
   if (!loginResponse.ok) {
     return NextResponse.json({ error: "تعذّر تسجيل الدخول. راجع بياناتك وحاول مرة أخرى." }, { status: 401 });
   }
 
-  const session = (await loginResponse.json()) as {
+  const session = (await loginResponse.json().catch(() => ({}))) as {
     secret?: string;
     expire?: string;
   };
 
-  if (!session.secret) {
-    return NextResponse.json({ error: "تعذّر إنشاء جلسة آمنة." }, { status: 502 });
+  // Appwrite REST may return the session secret in Set-Cookie rather than JSON.
+  const appwriteCookies = loginResponse.headers.getSetCookie();
+  const sessionSecret =
+    session.secret ??
+    readCookieValue(appwriteCookies, ADMIN_SESSION_COOKIE);
+
+  if (!sessionSecret) {
+    return NextResponse.json({ error: "استجاب Appwrite دون إرجاع بيانات الجلسة المطلوبة. راجع إعدادات المصادقة." }, { status: 502 });
   }
 
-  const userResponse = await fetch(`${APPWRITE_ENDPOINT}/account`, {
-    headers: {
-      "X-Appwrite-Project": APPWRITE_PROJECT_ID,
-      "X-Appwrite-Session": session.secret,
-    },
-    cache: "no-store",
-  });
+  let userResponse: Response;
+  try {
+    userResponse = await fetch(`${APPWRITE_ENDPOINT}/account`, {
+      headers: {
+        "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+        "X-Appwrite-Session": sessionSecret,
+      },
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json({ error: "تعذّر التحقق من جلسة المدير لدى Appwrite." }, { status: 502 });
+  }
 
   const user = userResponse.ok
-    ? (await userResponse.json()) as { $id?: string; email?: string }
+    ? (await userResponse.json().catch(() => null)) as { $id?: string; email?: string } | null
     : null;
 
   if (!user?.$id || !isAllowedAdmin(user.$id)) {
@@ -71,7 +99,7 @@ export async function POST(request: Request) {
       method: "DELETE",
       headers: {
         "X-Appwrite-Project": APPWRITE_PROJECT_ID,
-        "X-Appwrite-Session": session.secret,
+        "X-Appwrite-Session": sessionSecret,
       },
       cache: "no-store",
     }).catch(() => undefined);
@@ -79,10 +107,10 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ success: true, email: user.email ?? "" });
-  response.cookies.set(ADMIN_SESSION_COOKIE, session.secret, {
+  response.cookies.set(ADMIN_SESSION_COOKIE, sessionSecret, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     expires: session.expire ? new Date(session.expire) : undefined,
   });
