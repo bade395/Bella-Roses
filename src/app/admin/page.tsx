@@ -200,7 +200,7 @@ export default function AdminHomePage() {
   }
 
   const imageUrl = (fileId: string) =>
-    `https://fra.cloud.appwrite.io/v1/storage/buckets/menu_images/files/${encodeURIComponent(fileId)}/preview?project=6afac57c0019b2ee5fa0`;
+    `https://fra.cloud.appwrite.io/v1/storage/buckets/menu_images/files/${encodeURIComponent(fileId)}/view?project=6afac57c0019b2ee5fa0`;
 
   return <main className="admin-dashboard">
     <header className="admin-dashboard-header">
