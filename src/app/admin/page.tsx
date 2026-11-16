@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -142,7 +142,7 @@ export default function AdminHomePage() {
     setImageFile(null); setCropX(50); setCropY(50); setShowForm(true); setError(""); setNotice("");
   }
 
-  function startCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+  function startCropDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (!imagePreviewUrl || event.button !== 0) return;
     cropDrag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, cropX, cropY };
     event.currentTarget.setPointerCapture(event.pointerId);
