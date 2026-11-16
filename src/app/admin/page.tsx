@@ -1,14 +1,81 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 type AdminUser = { id: string; email: string; name: string };
+type Category = {
+  $id: string; name_ar: string; name_en: string; description_ar?: string;
+  description_en?: string; image_id?: string; is_active?: boolean; sort_order?: number;
+};
+type Product = {
+  $id: string; category_id: string; name_ar: string; name_en: string;
+  description_ar?: string; description_en?: string; price: number; image_id?: string;
+  is_available?: boolean; is_featured?: boolean; sort_order?: number;
+};
+type CategoryForm = {
+  name_ar: string; name_en: string; description_ar: string; description_en: string;
+  is_active: boolean; sort_order: number;
+};
+type ProductForm = {
+  category_id: string; name_ar: string; name_en: string; description_ar: string;
+  description_en: string; price: string; image_id: string; is_available: boolean;
+  is_featured: boolean; sort_order: number;
+};
+
+const emptyCategory: CategoryForm = {
+  name_ar: "", name_en: "", description_ar: "", description_en: "", is_active: true, sort_order: 0,
+};
+const emptyProduct: ProductForm = {
+  category_id: "", name_ar: "", name_en: "", description_ar: "", description_en: "",
+  price: "", image_id: "", is_available: true, is_featured: false, sort_order: 0,
+};
 
 export default function AdminHomePage() {
   const router = useRouter();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [checking, setChecking] = useState(true);
+  const [tab, setTab] = useState<"products" | "categories">("products");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [categoryForm, setCategoryForm] = useState<CategoryForm>(emptyCategory);
+  const [productForm, setProductForm] = useState<ProductForm>(emptyProduct);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [search, setSearch] = useState("");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [categoryResponse, productResponse] = await Promise.all([
+        fetch("/api/admin/menu?kind=categories", { cache: "no-store" }),
+        fetch("/api/admin/menu?kind=products", { cache: "no-store" }),
+      ]);
+      if (categoryResponse.status === 401 || productResponse.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+      if (!categoryResponse.ok || !productResponse.ok) {
+        const failed = !categoryResponse.ok ? categoryResponse : productResponse;
+        const data = await failed.json().catch(() => ({}));
+        throw new Error(data.error ?? "تعذّر تحميل بيانات القائمة.");
+      }
+      const [categoryData, productData] = await Promise.all([categoryResponse.json(), productResponse.json()]);
+      setCategories(categoryData.rows ?? []);
+      setProducts(productData.rows ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "حدث خطأ غير متوقع.");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
     let active = true;
@@ -23,20 +90,180 @@ export default function AdminHomePage() {
     return () => { active = false; };
   }, [router]);
 
+  useEffect(() => {
+    if (user) void loadData();
+  }, [user, loadData]);
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" }).catch(() => undefined);
     router.replace("/admin/login");
     router.refresh();
   }
 
+  function startNew() {
+    setEditingId(null);
+    setError("");
+    setNotice("");
+    setImageFile(null);
+    setCategoryForm(emptyCategory);
+    setProductForm({ ...emptyProduct, category_id: categories.find(item => item.is_active !== false)?.$id ?? "" });
+    setShowForm(true);
+  }
+
+  function editCategory(item: Category) {
+    setEditingId(item.$id);
+    setCategoryForm({
+      name_ar: item.name_ar, name_en: item.name_en, description_ar: item.description_ar ?? "",
+      description_en: item.description_en ?? "", is_active: item.is_active !== false,
+      sort_order: item.sort_order ?? 0,
+    });
+    setShowForm(true); setError(""); setNotice("");
+  }
+
+  function editProduct(item: Product) {
+    setEditingId(item.$id);
+    setProductForm({
+      category_id: item.category_id, name_ar: item.name_ar, name_en: item.name_en,
+      description_ar: item.description_ar ?? "", description_en: item.description_en ?? "",
+      price: String(item.price), image_id: item.image_id ?? "", is_available: item.is_available !== false,
+      is_featured: item.is_featured === true, sort_order: item.sort_order ?? 0,
+    });
+    setImageFile(null); setShowForm(true); setError(""); setNotice("");
+  }
+
+  async function uploadImage() {
+    if (!imageFile) return productForm.image_id;
+    const form = new FormData();
+    form.set("file", imageFile);
+    const response = await fetch("/api/admin/menu-image", { method: "POST", body: form });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error ?? "تعذّر رفع الصورة.");
+    return result.fileId as string;
+  }
+
+  async function submitForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const kind = tab;
+      let payload: Record<string, unknown>;
+      if (kind === "categories") {
+        payload = { kind, ...categoryForm };
+      } else {
+        if (!productForm.category_id) throw new Error("أضف تصنيفًا أولًا قبل إضافة المنتجات.");
+        const imageId = await uploadImage();
+        payload = { kind, ...productForm, price: Number(productForm.price), image_id: imageId };
+      }
+      const response = await fetch("/api/admin/menu", {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingId ? { ...payload, id: editingId } : payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "تعذّر حفظ البيانات.");
+      setShowForm(false); setEditingId(null); setImageFile(null);
+      setNotice(editingId ? "تم حفظ التعديلات بنجاح." : "تمت الإضافة بنجاح.");
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذّر حفظ البيانات.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleStatus(kind: "categories" | "products", item: Category | Product) {
+    const field = kind === "categories" ? "is_active" : "is_available";
+    const current = kind === "categories"
+      ? (item as Category).is_active !== false
+      : (item as Product).is_available !== false;
+    setError(""); setNotice("");
+    const response = await fetch("/api/admin/menu", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, id: item.$id, [field]: !current }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) { setError(result.error ?? "تعذّر تحديث الحالة."); return; }
+    setNotice("تم تحديث حالة العنصر.");
+    await loadData();
+  }
+
+  const categoryNames = useMemo(() => new Map(categories.map(item => [item.$id, item.name_ar])), [categories]);
+  const filteredCategories = categories.filter(item =>
+    (item.name_ar + " " + item.name_en).toLocaleLowerCase().includes(search.toLocaleLowerCase())
+  );
+  const filteredProducts = products.filter(item =>
+    (item.name_ar + " " + item.name_en).toLocaleLowerCase().includes(search.toLocaleLowerCase())
+  );
+
   if (checking || !user) {
     return <main className="admin-auth-page"><p className="admin-auth-copy">جارٍ التحقق من صلاحيات الدخول...</p></main>;
   }
 
+  const imageUrl = (fileId: string) =>
+    `https://fra.cloud.appwrite.io/v1/storage/buckets/menu_images/files/${encodeURIComponent(fileId)}/preview?project=6afac57c0019b2ee5fa0`;
+
   return <main className="admin-dashboard">
-    <header className="admin-dashboard-header"><Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link><button onClick={logout} className="admin-logout">تسجيل الخروج</button></header>
-    <section className="admin-dashboard-content"><p className="admin-auth-eyebrow">BELLA ROSES CONTROL CENTER</p><h1>أهلًا بك في لوحة الإدارة</h1><p>تم التحقق من جلستك وصلاحيات حسابك: {user.email}.</p>
-      <div className="admin-coming-soon"><span>✿</span><h2>لوحة التحكم قيد التجهيز</h2><p>تم تجهيز أساس المصادقة الخادمية. ستُبنى وحدات التصنيفات والمنتجات والصور والطلبات فوق هذا الأساس.</p></div>
+    <header className="admin-dashboard-header">
+      <Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link>
+      <div className="admin-header-actions"><span className="admin-user-email">{user.email}</span><button onClick={logout} className="admin-logout">تسجيل الخروج</button></div>
+    </header>
+    <section className="admin-dashboard-content admin-menu-content">
+      <p className="admin-auth-eyebrow">BELLA ROSES CONTROL CENTER</p>
+      <h1>إدارة القائمة</h1>
+      <p>تحكّم في تصنيفات ومنتجات بيلا روز، وتظهر التغييرات على المنيو بعد حفظها.</p>
+
+      <div className="admin-stats">
+        <div><span>التصنيفات</span><strong>{categories.length}</strong></div>
+        <div><span>المنتجات</span><strong>{products.length}</strong></div>
+        <div><span>المتاحة</span><strong>{products.filter(item => item.is_available !== false).length}</strong></div>
+      </div>
+
+      <div className="admin-menu-toolbar">
+        <div className="admin-menu-tabs">
+          <button className={tab === "products" ? "active" : ""} onClick={() => { setTab("products"); setShowForm(false); setSearch(""); setError(""); }}>المنتجات</button>
+          <button className={tab === "categories" ? "active" : ""} onClick={() => { setTab("categories"); setShowForm(false); setSearch(""); setError(""); }}>التصنيفات</button>
+        </div>
+        <button className="admin-primary-button" onClick={startNew}>＋ إضافة {tab === "products" ? "منتج" : "تصنيف"}</button>
+      </div>
+
+      {notice ? <p className="admin-notice" role="status">{notice}</p> : null}
+      {error ? <p className="admin-error-banner" role="alert">{error}</p> : null}
+
+      {showForm ? <form className="admin-editor" onSubmit={submitForm}>
+        <div className="admin-editor-heading"><h2>{editingId ? "تعديل" : "إضافة"} {tab === "products" ? "منتج" : "تصنيف"}</h2><button type="button" onClick={() => setShowForm(false)} aria-label="إغلاق">×</button></div>
+        {tab === "categories" ? <>
+          <div className="admin-form-grid">
+            <label>الاسم بالعربية<input required maxLength={120} value={categoryForm.name_ar} onChange={e => setCategoryForm({ ...categoryForm, name_ar: e.target.value })} /></label>
+            <label>الاسم بالإنجليزية<input required maxLength={120} dir="ltr" value={categoryForm.name_en} onChange={e => setCategoryForm({ ...categoryForm, name_en: e.target.value })} /></label>
+            <label>الوصف بالعربية<textarea value={categoryForm.description_ar} onChange={e => setCategoryForm({ ...categoryForm, description_ar: e.target.value })} /></label>
+            <label>الوصف بالإنجليزية<textarea dir="ltr" value={categoryForm.description_en} onChange={e => setCategoryForm({ ...categoryForm, description_en: e.target.value })} /></label>
+            <label>ترتيب العرض<input type="number" step="1" value={categoryForm.sort_order} onChange={e => setCategoryForm({ ...categoryForm, sort_order: Number(e.target.value) })} /></label>
+            <label className="admin-check-label"><input type="checkbox" checked={categoryForm.is_active} onChange={e => setCategoryForm({ ...categoryForm, is_active: e.target.checked })} /> تصنيف نشط</label>
+          </div>
+        </> : <>
+          <div className="admin-form-grid">
+            <label>التصنيف<select required value={productForm.category_id} onChange={e => setProductForm({ ...productForm, category_id: e.target.value })}><option value="">اختر التصنيف</option>{categories.filter(item => item.is_active !== false).map(item => <option key={item.$id} value={item.$id}>{item.name_ar}</option>)}</select></label>
+            <label>السعر (ر.س)<input required type="number" min="0" max="1000000" step="0.01" value={productForm.price} onChange={e => setProductForm({ ...productForm, price: e.target.value })} /></label>
+            <label>اسم المنتج بالعربية<input required maxLength={160} value={productForm.name_ar} onChange={e => setProductForm({ ...productForm, name_ar: e.target.value })} /></label>
+            <label>اسم المنتج بالإنجليزية<input required maxLength={160} dir="ltr" value={productForm.name_en} onChange={e => setProductForm({ ...productForm, name_en: e.target.value })} /></label>
+            <label>الوصف بالعربية<textarea value={productForm.description_ar} onChange={e => setProductForm({ ...productForm, description_ar: e.target.value })} /></label>
+            <label>الوصف بالإنجليزية<textarea dir="ltr" value={productForm.description_en} onChange={e => setProductForm({ ...productForm, description_en: e.target.value })} /></label>
+            <label className="admin-file-label">صورة المنتج<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e => setImageFile(e.target.files?.[0] ?? null)} /><small>{imageFile ? imageFile.name : productForm.image_id ? "تم ربط صورة بهذا المنتج — اختر ملفًا لاستبدالها" : "JPG / PNG / WebP / AVIF — حتى 5MB"}</small></label>
+            <label>ترتيب العرض<input type="number" step="1" value={productForm.sort_order} onChange={e => setProductForm({ ...productForm, sort_order: Number(e.target.value) })} /></label>
+            <label className="admin-check-label"><input type="checkbox" checked={productForm.is_available} onChange={e => setProductForm({ ...productForm, is_available: e.target.checked })} /> متاح في المنيو</label>
+            <label className="admin-check-label"><input type="checkbox" checked={productForm.is_featured} onChange={e => setProductForm({ ...productForm, is_featured: e.target.checked })} /> منتج مميز</label>
+          </div>
+        </>}
+        <div className="admin-editor-actions"><button type="button" className="admin-secondary-button" onClick={() => setShowForm(false)}>إلغاء</button><button className="admin-primary-button" disabled={saving}>{saving ? "جارٍ الحفظ..." : "حفظ البيانات"}</button></div>
+      </form> : null}
+
+      <div className="admin-list-toolbar"><input placeholder={tab === "products" ? "ابحث عن منتج..." : "ابحث عن تصنيف..."} value={search} onChange={e => setSearch(e.target.value)} /><button onClick={() => void loadData()}>↻ تحديث</button></div>
+      {loading ? <div className="admin-empty-state">جارٍ تحميل بيانات القائمة...</div> : tab === "categories" ? (
+        filteredCategories.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>التصنيف</th><th>الاسم الإنجليزي</th><th>المنتجات</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filteredCategories.map(item => <tr key={item.$id}><td><strong>{item.name_ar}</strong></td><td dir="ltr">{item.name_en}</td><td>{products.filter(product => product.category_id === item.$id).length}</td><td><span className={item.is_active === false ? "admin-status off" : "admin-status"}>{item.is_active === false ? "مؤرشف" : "نشط"}</span></td><td><div className="admin-row-actions"><button onClick={() => editCategory(item)}>تعديل</button><button onClick={() => void toggleStatus("categories", item)}>{item.is_active === false ? "تفعيل" : "إيقاف"}</button></div></td></tr>)}</tbody></table></div> : <div className="admin-empty-state">لا توجد تصنيفات حتى الآن. أضف أول تصنيف من الزر أعلاه.</div>
+      ) : (
+        filteredProducts.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>{filteredProducts.map(item => <tr key={item.$id}><td><div className="admin-product-cell">{item.image_id ? <img src={imageUrl(item.image_id)} alt="" /> : <span className="admin-product-no-image">✿</span>}<div><strong>{item.name_ar}</strong><small dir="ltr">{item.name_en}</small></div></div></td><td>{categoryNames.get(item.category_id) ?? "تصنيف غير معروف"}</td><td className="admin-price">{Number(item.price).toFixed(2)} ر.س</td><td><span className={item.is_available === false ? "admin-status off" : "admin-status"}>{item.is_available === false ? "غير متاح" : "متاح"}</span></td><td><div className="admin-row-actions"><button onClick={() => editProduct(item)}>تعديل</button><button onClick={() => void toggleStatus("products", item)}>{item.is_available === false ? "إتاحة" : "إيقاف"}</button></div></td></tr>)}</tbody></table></div> : <div className="admin-empty-state">لا توجد منتجات حتى الآن. أضف منتجاتك وأسعارك الفعلية من الزر أعلاه.</div>
+      )}
+      <p className="admin-data-note">تُحفظ التغييرات في Appwrite. الإيقاف يؤرشف العنصر دون حذف سجلاته أو التأثير على الطلبات السابقة.</p>
     </section>
   </main>;
 }
