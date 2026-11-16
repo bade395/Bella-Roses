@@ -95,7 +95,7 @@ export default function Home() {
         (product.description_ar ?? "").toLocaleLowerCase("ar").includes(term);
       return belongsToActiveCategory && matchesCategory && matchesSearch;
     });
-  }, [activeCategory, products, search]);
+  }, [activeCategory, categories, products, search]);
 
   return (
     <main className="bella-page">
