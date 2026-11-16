@@ -82,7 +82,9 @@ export default function Home() {
 
   const visibleProducts = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("ar");
+    const activeCategoryIds = new Set(categories.map((category) => category.$id));
     return products.filter((product) => {
+      const belongsToActiveCategory = activeCategoryIds.has(product.category_id);
       const matchesCategory =
         activeCategory === "all" || product.category_id === activeCategory;
       const matchesSearch =
@@ -90,7 +92,7 @@ export default function Home() {
         product.name_ar.toLocaleLowerCase("ar").includes(term) ||
         (product.name_en ?? "").toLocaleLowerCase("en").includes(term) ||
         (product.description_ar ?? "").toLocaleLowerCase("ar").includes(term);
-      return matchesCategory && matchesSearch;
+      return belongsToActiveCategory && matchesCategory && matchesSearch;
     });
   }, [activeCategory, products, search]);
 
