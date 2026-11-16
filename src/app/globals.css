@@ -120,7 +120,7 @@ a { color: inherit; text-decoration: none; }
 .empty-line { width: 42px; height: 1px; margin-top: 24px; background: #d8b5bb; }
 .product-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .product-card { border: 1px solid #f0e7e2; background: white; }
-.product-placeholder { position: relative; aspect-ratio: 1.28; display: grid; place-items: center; background: linear-gradient(135deg, #f6e9e7, #f9f3ee); color: #c28b97; font-size: 44px; }
+.product-placeholder { position: relative; overflow: hidden; aspect-ratio: 1.28; display: grid; place-items: center; background: linear-gradient(135deg, #f6e9e7, #f9f3ee); color: #c28b97; font-size: 44px; }
 .product-placeholder small { position: absolute; top: 13px; right: 13px; padding: 5px 9px; background: #fffaf6; color: #9d6876; font-size: 10px; }
 .product-info { display: flex; justify-content: space-between; gap: 14px; padding: 18px; }
 .product-info h3 { margin: 0; color: #4b3a40; font-size: 17px; font-weight: 600; }
