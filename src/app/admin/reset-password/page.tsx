@@ -10,7 +10,7 @@ function ResetForm(){
   if(!account||!userId||!secret){setError("رابط الاستعادة غير مكتمل أو منتهي الصلاحية. اطلب رابطًا جديدًا.");return;}
   if(password.length<8){setError("يجب ألا تقل كلمة المرور عن 8 أحرف.");return;}
   if(password!==confirm){setError("كلمتا المرور غير متطابقتين.");return;}
-  setBusy(true);try{await account.updateRecovery({userId,secret,password,passwordAgain:confirm});setMessage("تم تحديث كلمة المرور. يمكنك الآن تسجيل الدخول.");setPassword("");setConfirm("");}
+  setBusy(true);try{await account.updateRecovery({userId,secret,password});setMessage("تم تحديث كلمة المرور. يمكنك الآن تسجيل الدخول.");setPassword("");setConfirm("");}
   catch{setError("تعذّر تحديث كلمة المرور. قد يكون الرابط منتهي الصلاحية؛ اطلب رابطًا جديدًا.");}finally{setBusy(false);}
  }
  return <main className="admin-auth-page"><section className="admin-auth-card">
