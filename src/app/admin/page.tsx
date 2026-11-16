@@ -48,7 +48,17 @@ export default function AdminHomePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [cropX, setCropX] = useState(50);
+  const [cropY, setCropY] = useState(50);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!imageFile) { setImagePreviewUrl(""); return; }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -128,13 +138,37 @@ export default function AdminHomePage() {
       price: String(item.price), image_id: item.image_id ?? "", is_available: item.is_available !== false,
       is_featured: item.is_featured === true, sort_order: item.sort_order ?? 0,
     });
-    setImageFile(null); setShowForm(true); setError(""); setNotice("");
+    setImageFile(null); setCropX(50); setCropY(50); setShowForm(true); setError(""); setNotice("");
   }
 
   async function uploadImage() {
     if (!imageFile) return productForm.image_id;
+
+    // Normalize every menu photo to 1200x900 (4:3), cropping without stretching.
+    const source = await createImageBitmap(imageFile);
+    const targetRatio = 4 / 3;
+    let sourceWidth = source.width;
+    let sourceHeight = source.height;
+    if (sourceWidth / sourceHeight > targetRatio) {
+      sourceWidth = sourceHeight * targetRatio;
+    } else {
+      sourceHeight = sourceWidth / targetRatio;
+    }
+    const sourceX = (source.width - sourceWidth) * (cropX / 100);
+    const sourceY = (source.height - sourceHeight) * (cropY / 100);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 900;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("تعذّر تجهيز الصورة. جرّب ملفًا آخر.");
+    context.drawImage(source, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, 1200, 900);
+    source.close();
+    const processedBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("تعذّر معالجة الصورة.")), "image/webp", 0.9);
+    });
+    const processedFile = new File([processedBlob], "bella-menu-image.webp", { type: "image/webp" });
     const form = new FormData();
-    form.set("file", imageFile);
+    form.set("file", processedFile);
     const response = await fetch("/api/admin/menu-image", { method: "POST", body: form });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error ?? "تعذّر رفع الصورة.");
@@ -248,7 +282,17 @@ export default function AdminHomePage() {
             <label>اسم المنتج بالإنجليزية<input required maxLength={160} dir="ltr" value={productForm.name_en} onChange={e => setProductForm({ ...productForm, name_en: e.target.value })} /></label>
             <label>الوصف بالعربية<textarea value={productForm.description_ar} onChange={e => setProductForm({ ...productForm, description_ar: e.target.value })} /></label>
             <label>الوصف بالإنجليزية<textarea dir="ltr" value={productForm.description_en} onChange={e => setProductForm({ ...productForm, description_en: e.target.value })} /></label>
-            <label className="admin-file-label">صورة المنتج<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e => setImageFile(e.target.files?.[0] ?? null)} /><small>{imageFile ? imageFile.name : productForm.image_id ? "تم ربط صورة بهذا المنتج — اختر ملفًا لاستبدالها" : "JPG / PNG / WebP / AVIF — حتى 5MB"}</small></label>
+            <label className="admin-file-label">صورة المنتج<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e => { setImageFile(e.target.files?.[0] ?? null); setCropX(50); setCropY(50); }} /><small>{imageFile ? imageFile.name : productForm.image_id ? "تم ربط صورة بهذا المنتج — اختر ملفًا لاستبدالها" : "JPG / PNG / WebP / AVIF — حتى 5MB"}</small></label>
+            {imageFile && imagePreviewUrl ? <div className="admin-image-editor">
+              <div className="admin-image-preview"><img src={imagePreviewUrl} alt="معاينة قص صورة المنتج" style={{ objectFit: "cover", objectPosition: `${cropX}% ${cropY}%` }} /></div>
+              <div className="admin-image-controls">
+                <strong>ضبط إطار الصورة</strong>
+                <small>المقاس النهائي 1200 × 900 بكسل (4:3). حرّك الصورة لتحديد الجزء الظاهر دون تمديدها.</small>
+                <label>أفقي <input type="range" min="0" max="100" value={cropX} onChange={e => setCropX(Number(e.target.value))} /></label>
+                <label>رأسي <input type="range" min="0" max="100" value={cropY} onChange={e => setCropY(Number(e.target.value))} /></label>
+                <button type="button" className="admin-secondary-button" onClick={() => { setCropX(50); setCropY(50); }}>إعادة ضبط القص</button>
+              </div>
+            </div> : null}
             <label>ترتيب العرض<input type="number" step="1" value={productForm.sort_order} onChange={e => setProductForm({ ...productForm, sort_order: Number(e.target.value) })} /></label>
             <label className="admin-check-label"><input type="checkbox" checked={productForm.is_available} onChange={e => setProductForm({ ...productForm, is_available: e.target.checked })} /> متاح في المنيو</label>
             <label className="admin-check-label"><input type="checkbox" checked={productForm.is_featured} onChange={e => setProductForm({ ...productForm, is_featured: e.target.checked })} /> منتج مميز</label>
