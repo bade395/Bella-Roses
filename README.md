@@ -33,6 +33,7 @@ Public access is read-only for menu categories, products and menu images. Order,
 ## Server environment
 - `APPWRITE_API_KEY`: server-only Appwrite key. Never expose it to browser code or commit it.
 - `APPWRITE_ADMIN_USER_IDS`: comma-separated Appwrite user IDs allowed to administer this project. The initial admin user ID is configured as the fallback in the server auth module.
+- The server key must include `rows.read`, `rows.write`, and `files.write` for the admin menu APIs, in addition to the auth scopes used by login.
 
 The admin login is exchanged on the server. The Appwrite session is stored in an HttpOnly, Secure (production), SameSite cookie. Every admin session check calls Appwrite and verifies the user's immutable ID against the allowlist. A client-side email check is not used as authorization.
 
@@ -48,4 +49,4 @@ The admin login is exchanged on the server. The Appwrite session is stored in an
 - Public menu tables and images remain read-only to visitors.
 
 ## Current scope
-The digital menu and Appwrite data foundation are provisioned. Server-verified administrator sessions are now the foundation for the upcoming menu-management, QR table ordering, order processing and staff dashboard modules. No sample products or prices are inserted.
+The digital menu and Appwrite data foundation are provisioned. The admin workspace now supports category and product listing, creation, editing, availability/activation controls, and menu image uploads through server-only API routes. Disabling an item archives it rather than deleting historical references. QR table ordering, order processing and staff dashboard modules remain future phases. No sample products or prices are inserted.
