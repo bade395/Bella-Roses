@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
     const settingsResult = await appwrite(`/tablesdb/${DATABASE_ID}/tables/restaurant_settings/rows/main`);
     if (!settingsResult.response.ok) throw new Error("SETTINGS_LOOKUP");
-    const settings = settingsResult.payload.data as { ordering_enabled?: boolean } | undefined;
+    const settings = settingsResult.payload as { ordering_enabled?: boolean };
     if (settings?.ordering_enabled !== true) return error("الطلب الإلكتروني متوقف حاليًا. يرجى طلب المساعدة من فريق المطعم.", 409);
 
     const products = await Promise.all([...requested.entries()].map(async ([id, details]) => {
