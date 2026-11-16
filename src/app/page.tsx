@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Query, type Models } from "appwrite";
 import {
   APPWRITE_DATABASE_ID,
@@ -211,7 +212,15 @@ export default function Home() {
             {visibleProducts.map((product) => (
               <article className="product-card" key={product.$id}>
                 <div className="product-placeholder">
-                  <span>✿</span>
+                  {product.image_id ? (
+                    <Image
+                      src={`${process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT}/storage/buckets/menu_images/files/${encodeURIComponent(product.image_id)}/preview?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}`}
+                      alt={product.name_ar}
+                      fill
+                      sizes="(max-width: 420px) 100vw, (max-width: 760px) 50vw, 33vw"
+                      unoptimized
+                    />
+                  ) : <span>✿</span>}
                   {product.is_featured ? <small>اختيارنا</small> : null}
                 </div>
                 <div className="product-info">
