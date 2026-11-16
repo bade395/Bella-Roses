@@ -95,7 +95,8 @@ export default function AdminOrdersPage() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!appwriteClient) { setLiveStatus("fallback"); return; }
+    const client = appwriteClient;
+    if (!client) { setLiveStatus("fallback"); return; }
     let active = true;
     let realtime: Realtime | null = null;
     let subscription: { unsubscribe: () => Promise<void> } | null = null;
@@ -106,9 +107,9 @@ export default function AdminOrdersPage() {
         const tokenData = await tokenResponse.json();
         if (!tokenResponse.ok || !tokenData.jwt) throw new Error("JWT");
         if (!active) return;
-        appwriteClient.setJWT(tokenData.jwt as string);
+        client.setJWT(tokenData.jwt as string);
         if (subscription) await subscription.unsubscribe().catch(() => undefined);
-        realtime = new Realtime(appwriteClient);
+        realtime = new Realtime(client);
         subscription = await realtime.subscribe(
           Channel.tablesdb(APPWRITE_DATABASE_ID).table("orders").row(),
           () => { if (active) void load(true); },
@@ -128,7 +129,7 @@ export default function AdminOrdersPage() {
       if (pollTimer) clearInterval(pollTimer);
       if (subscription) void subscription.unsubscribe().catch(() => undefined);
       if (realtime) void realtime.disconnect().catch(() => undefined);
-      appwriteClient?.setJWT("");
+      client.setJWT("");
       if (audioContext.current) void audioContext.current.close();
     };
   }, [load]);
