@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Query } from "appwrite";
+import { Query, type Models } from "appwrite";
 import {
   APPWRITE_DATABASE_ID,
   APPWRITE_TABLES,
   tablesDB,
 } from "@/lib/appwrite";
 
-type CategoryRow = {
+type CategoryRow = Models.Row & {
   $id: string;
   name_ar: string;
   name_en?: string;
@@ -17,7 +17,7 @@ type CategoryRow = {
   sort_order?: number;
 };
 
-type ProductRow = {
+type ProductRow = Models.Row & {
   $id: string;
   category_id: string;
   name_ar: string;
