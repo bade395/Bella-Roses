@@ -172,17 +172,17 @@ export async function POST(request: Request) {
       body: JSON.stringify({ operations }),
     });
     if (!staged.response.ok) {
-      await appwrite(`/tablesdb/transactions/${encodeURIComponent(transactionId)}?commit=false`, { method: "PATCH", body: JSON.stringify({}) });
-      console.error("Order transaction staging failed", { status: staged.response.status, type: staged.payload.type });
+      await appwrite(`/tablesdb/transactions/${encodeURIComponent(transactionId)}`, { method: "PATCH", body: JSON.stringify({ commit: false }) });
+      console.error("Order transaction staging failed", { status: staged.response.status, type: staged.payload.type, message: staged.payload.message });
       throw new Error("TRANSACTION_STAGE");
     }
 
-    const committed = await appwrite(`/tablesdb/transactions/${encodeURIComponent(transactionId)}?commit=true`, {
+    const committed = await appwrite(`/tablesdb/transactions/${encodeURIComponent(transactionId)}`, {
       method: "PATCH",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ commit: true }),
     });
     if (!committed.response.ok) {
-      console.error("Order transaction commit failed", { status: committed.response.status, type: committed.payload.type });
+      console.error("Order transaction commit failed", { status: committed.response.status, type: committed.payload.type, message: committed.payload.message });
       throw new Error("TRANSACTION_COMMIT");
     }
 
