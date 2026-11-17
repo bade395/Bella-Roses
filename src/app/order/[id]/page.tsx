@@ -63,7 +63,7 @@ export default function TrackOrderPage() {
   return (
     <main className="track-page">
       <header className="track-header">
-        <Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link>
+        <Link className="admin-auth-brand" href="/menu">BELLA ROSES <span>✿</span></Link>
         <span>ORDER TRACKING</span>
       </header>
       <section className="track-card">
@@ -89,7 +89,7 @@ export default function TrackOrderPage() {
           </div>
           <p className="track-refresh-note">يتم تحديث الحالة تلقائيًا كل 5 ثوانٍ ما دامت صفحة المتابعة مفتوحة.</p>
         </> : !error ? <div className="admin-empty-state">جارٍ تحميل تفاصيل طلبك...</div> : null}
-        <Link className="track-home-link" href="/">العودة إلى قائمة Bella Roses</Link>
+        <Link className="track-home-link" href="/menu">العودة إلى قائمة Bella Roses</Link>
       </section>
     </main>
   );
