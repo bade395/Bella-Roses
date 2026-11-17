@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     ? (await userResponse.json().catch(() => null)) as { $id?: string; email?: string } | null
     : null;
 
-  if (!user?.$id || (!isAllowedAdmin(user.$id) && !process.env.APPWRITE_STAFF_TEAM_ID)) {
+  if (!user?.$id || (!isAllowedAdmin(user.$id) && !(process.env.APPWRITE_STAFF_TEAM_ID ?? "bella-roses-staff"))) {
     await fetch(`${APPWRITE_ENDPOINT}/account/sessions/current`, {
       method: "DELETE",
       headers: {
