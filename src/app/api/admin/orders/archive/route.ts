@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAdminUser, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ async function call(path: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return fail("غير مصرح.", 401);
+  if (!(await getStaffUser("orders.read"))) return fail("غير مصرح.", 401);
   const params = new URL(request.url).searchParams;
   const status = params.get("status") ?? "all";
   const limit = Math.min(100, Math.max(10, Number(params.get("limit")) || 50));
