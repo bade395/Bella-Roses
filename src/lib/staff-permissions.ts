@@ -87,7 +87,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     };
   }
 
-  const teamId = process.env.APPWRITE_STAFF_TEAM_ID;
+  const teamId = process.env.APPWRITE_STAFF_TEAM_ID ?? "bella-roses-staff";
   if (!teamId) return null;
 
   const query = encodeURIComponent(JSON.stringify({
