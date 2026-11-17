@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   try {
     const end = new Date();
     const start = new Date(end.getTime() - range * 24 * 60 * 60 * 1000);
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
       const queries = [
         q({ method: "greaterThanEqual", attribute: "$createdAt", values: [start.toISOString()] }),
@@ -68,7 +68,9 @@ export async function GET(request: Request) {
       if (status === "served") { served += 1; revenue += Number.isFinite(amount) ? amount : 0; }
       else if (status === "cancelled") cancelled += 1;
       else active += 1;
-      const date = localDay(order.$createdAt);
+      const createdAt = typeof order.$createdAt === "string" ? order.$createdAt : "";
+      if (!createdAt) continue;
+      const date = localDay(createdAt);
       const day = days.get(date) ?? { date, orders: 0, served: 0, cancelled: 0, revenue: 0 };
       day.orders += 1;
       if (status === "served") { day.served += 1; day.revenue += Number.isFinite(amount) ? amount : 0; }
