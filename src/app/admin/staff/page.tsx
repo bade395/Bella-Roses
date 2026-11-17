@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type Staff = { id:string; email:string; name:string; role:string; membershipId:string; confirm?:boolean; joined?:string|null };
+type Staff = { $id?:string; membershipId:string; email?:string; name?:string; userName?:string; userEmail?:string; roles?:string[]; confirm?:boolean; joined?:string|null };
 const roles = [
   {value:"manager",label:"مدير"},
   {value:"cashier",label:"كاشير"},
