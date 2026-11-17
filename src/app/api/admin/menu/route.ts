@@ -152,7 +152,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await requireAdmin(request))) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
+  const admin = await requireAdmin(request);
+  if (!admin) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return jsonError("بيانات الطلب غير صالحة."); }
   const kind = body.kind;
