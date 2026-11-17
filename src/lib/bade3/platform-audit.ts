@@ -33,7 +33,7 @@ export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promis
   const endpoint = (process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? "").replace(/\/+$/, "");
   const projectId = process.env.APPWRITE_PROJECT_ID ?? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
   const apiKey = process.env.APPWRITE_API_KEY;
-  const databaseId = process.env.BADE3_CORE_DATABASE_ID ?? "bade3_core";
+  const databaseId = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
   const tableId = process.env.BADE3_AUDIT_EVENTS_TABLE_ID ?? "audit_events";
 
   if (!endpoint || !projectId || !apiKey) throw new Error("PLATFORM_AUDIT_NOT_CONFIGURED");
@@ -58,7 +58,7 @@ export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promis
           resource_type: event.resourceType.slice(0, 80),
           resource_id: event.resourceId?.slice(0, 128) ?? null,
           result: event.outcome,
-          metadata: safeMetadata(event.metadata),
+          metadata: JSON.stringify(safeMetadata(event.metadata)),
           created_at: new Date().toISOString(),
         },
       }),
