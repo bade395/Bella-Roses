@@ -21,7 +21,7 @@ export type StaffPermission = (typeof STAFF_PERMISSIONS)[number];
 
 const ROLE_PERMISSIONS: Record<StaffRole, readonly StaffPermission[]> = {
   owner: STAFF_PERMISSIONS,
-  manager: STAFF_PERMISSIONS,
+  manager: ["menu.manage", "tables.manage", "orders.read", "orders.update", "reports.read"],
   cashier: ["orders.read", "orders.update", "reports.read"],
   kitchen: ["orders.read", "orders.update"],
   service: ["orders.read", "orders.update"],
