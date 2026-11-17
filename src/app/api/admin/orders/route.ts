@@ -53,10 +53,19 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!sameOrigin(request)) return fail("طلب غير مسموح.", 403);
-  if (!(await getStaffUser("orders.update"))) return fail("غير مصرح أو لا تملك صلاحية تحديث الطلبات.", 403);
+  const staff = await getStaffUser("orders.update");
+  if (!staff) return fail("غير مصرح أو لا تملك صلاحية تحديث الطلبات.", 403);
   const body = await request.json().catch(() => null) as { id?: unknown; status?: unknown } | null;
   if (!body || typeof body.id !== "string" || !/^[A-Za-z0-9._-]{1,36}$/.test(body.id) || typeof body.status !== "string" || !STATUSES.includes(body.status as typeof STATUSES[number])) {
     return fail("بيانات تحديث الطلب غير صالحة.");
+  }
+  const roleStatuses: Record<string, readonly string[]> = {
+    kitchen: ["accepted", "preparing", "ready"],
+    service: ["ready", "served", "cancelled"],
+  };
+  const allowedStatuses = roleStatuses[staff.role];
+  if (allowedStatuses && !allowedStatuses.includes(body.status)) {
+    return fail("هذا الدور لا يملك صلاحية نقل الطلب إلى هذه الحالة.", 403);
   }
   try {
     const result = await call(`/tablesdb/${DB}/tables/orders/rows/${encodeURIComponent(body.id)}`, {
