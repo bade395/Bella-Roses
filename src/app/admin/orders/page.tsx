@@ -180,12 +180,14 @@ export default function AdminOrdersPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "تعذّر تحديث الحالة.");
       setOrders((current) => current.map((item) => item.$id === order.$id ? { ...item, status } : item));
+      if (status === "served" || status === "cancelled") setSelected((current) => current === order.$id ? null : current);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذّر تحديث الحالة.");
     } finally { setSaving(""); }
   }
 
   const tableMap = new Map(tables.map((table) => [table.$id, table]));
+  const activeOrders = orders.filter((order) => !["served", "cancelled"].includes(order.status));
   const selectedOrder = orders.find((order) => order.$id === selected) ?? null;
 
   return (
@@ -202,7 +204,7 @@ export default function AdminOrdersPage() {
         <p className="admin-auth-eyebrow">BELLA ROSES CONTROL CENTER</p>
         <div className="orders-page-title"><div><h1>مركز متابعة الطلبات</h1><p>كل طلب واضح، وكل تحديث في مكانه.</p></div><span className={liveStatus === "connected" ? "orders-live-connected" : "orders-live-fallback"}>{liveStatus === "connected" ? "● متصل لحظيًا" : "● تحديث تلقائي احتياطي"}</span></div>
         <div className="admin-stats">
-          <div><span>كل الطلبات</span><strong>{orders.length}</strong></div>
+          <div><span>الطلبات النشطة</span><strong>{orders.filter((order) => !["served", "cancelled"].includes(order.status)).length}</strong></div>
           <div><span>طلبات جديدة</span><strong>{orders.filter((order) => order.status === "new").length}</strong></div>
           <div><span>قيد التحضير</span><strong>{orders.filter((order) => ["accepted", "preparing"].includes(order.status)).length}</strong></div>
         </div>
@@ -215,11 +217,11 @@ export default function AdminOrdersPage() {
           </div>
         </div>
         {notificationPermission === "denied" ? <p className="orders-permission-note">إشعارات المتصفح محظورة حاليًا. اسمح بها من إعدادات الموقع في المتصفح.</p> : null}
-        {loading ? <div className="admin-empty-state">جارٍ تحميل الطلبات...</div> : orders.length === 0 ? (
-          <div className="admin-empty-state">لا توجد طلبات حتى الآن.</div>
+        {loading ? <div className="admin-empty-state">جارٍ تحميل الطلبات...</div> : activeOrders.length === 0 ? (
+          <div className="admin-empty-state">لا توجد طلبات نشطة حاليًا. ستظهر هنا الطلبات الجديدة وقيد التنفيذ فقط.</div>
         ) : (
           <div className="orders-card-grid">
-            {orders.map((order) => {
+            {activeOrders.map((order) => {
               const table = tableMap.get(order.table_id);
               return <article className={`orders-admin-card status-${order.status}`} key={order.$id}>
                 <div className="orders-admin-card-top"><span className={`orders-status-pill status-${order.status}`}>{statusLabels[order.status] ?? order.status}</span><small>{new Date(order.$createdAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</small></div>
@@ -236,7 +238,7 @@ export default function AdminOrdersPage() {
             })}
           </div>
         )}
-        <p className="admin-data-note">الطلبات مرتبة من الأحدث إلى الأقدم. شاشة العرض تعرض الطلبات الجديدة وقيد التحضير والجاهزة فقط.</p>
+        <p className="admin-data-note">الطلبات مرتبة من الأحدث إلى الأقدم. عند التسليم أو الإلغاء يختفي الطلب من هذه الشاشة تلقائيًا، مع الاحتفاظ بسجله في قاعدة البيانات.</p>
       </section>
       {selectedOrder ? <div className="cart-backdrop admin-order-backdrop" role="presentation" onClick={() => setSelected(null)}>
         <section className="cart-panel admin-order-panel" role="dialog" aria-modal="true" aria-labelledby="order-detail-title" onClick={(event) => event.stopPropagation()}>
