@@ -14,7 +14,7 @@ When the Team ID is not configured, only the existing immutable admin allowlist 
 | Appwrite Team role | Permissions |
 | --- | --- |
 | `owner` | All permissions; bootstrap owner |
-| `manager` | Staff, menu, tables, orders, reports |
+| `manager` | Menu, tables, orders, reports (staff membership changes remain owner-only) |
 | `cashier` | Read/update orders and read reports |
 | `kitchen` | Read/update orders |
 | `service` | Read/update orders |
@@ -35,3 +35,9 @@ When the Team ID is not configured, only the existing immutable admin allowlist 
 - The owner allowlist is a bootstrap and recovery mechanism; it must not be removed until the Team owner membership and recovery path have been verified.
 - API routes must call `getStaffContext()` and enforce the specific permission with `hasStaffPermission()`. Hiding navigation items in the browser is not authorization.
 - Do not create the production Team, invite staff, or alter existing memberships as part of code deployment. Those are separate owner-approved operational steps.
+
+## Team bootstrap and invitations
+
+The default Team ID is `bella-roses-staff`; override it with the server-only `APPWRITE_STAFF_TEAM_ID` environment variable if needed. The owner opens `/admin/staff` and uses **Set up staff team** once. Team creation uses the owner's authenticated Appwrite session, making that account the Team owner. The owner can then send email invitations and manage membership roles from the same page.
+
+Invited staff must sign in with the invited account and accept the invitation at `/admin/staff/accept`. Staff-management endpoints are restricted to the Team owner because Appwrite's membership-management API requires owner privileges.
