@@ -505,3 +505,78 @@ body { background: var(--bella-cream); color: var(--bella-espresso); font-family
   .orders-display-header { flex-wrap: wrap; }
   .footer-brand { width: 120px; height: 100px; }
 }
+
+
+/* Bella Roses brand mark: use the standalone rose symbol, never the faded wordmark. */
+.brand-lockup {
+  display: block !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  background: url('/brand/rose-mark.webp') center / contain no-repeat !important;
+  opacity: 1 !important;
+  filter: none !important;
+  font-size: 0 !important;
+}
+.brand-lockup > * { display: none !important; }
+.footer-brand {
+  display: block !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  background: url('/brand/rose-mark.webp') center / contain no-repeat !important;
+  opacity: 1 !important;
+  filter: none !important;
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+}
+.footer-brand span { display: none !important; }
+.admin-auth-brand {
+  display: block !important;
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  height: 42px !important;
+  padding: 0 !important;
+  background: url('/brand/rose-mark.webp') center / contain no-repeat !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+  line-height: 0 !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+.admin-auth-brand span { display: none !important; }
+.orders-display-brand {
+  display: block !important;
+  width: 42px !important;
+  height: 42px !important;
+  padding: 0 !important;
+  background: url('/brand/rose-mark.webp') center / contain no-repeat !important;
+  font-size: 0 !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+.orders-display-brand span, .orders-display-brand small { display: none !important; }
+
+.admin-hub-content { padding-top: 54px; padding-bottom: 80px; }
+.admin-hub-content h1 { margin: 8px 0 10px; color: var(--bella-espresso, #2B211D); font-size: clamp(30px, 5vw, 46px); }
+.admin-hub-intro { margin: 0 0 34px; color: var(--bella-muted, #76635d); }
+.admin-department-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.admin-department-card {
+  min-height: 220px; padding: 26px; border: 1px solid var(--bella-line, #eadbd6);
+  border-radius: 18px; background: #fff; color: var(--bella-espresso, #2B211D);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  text-decoration: none; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.admin-department-card:hover { transform: translateY(-3px); border-color: #d7a29a; box-shadow: 0 14px 34px #4a2a2412; }
+.admin-department-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: #fbefed; color: #9c5c58; font-size: 25px; }
+.admin-department-tag { color: #a07870; font: 500 10px 'Jost', sans-serif; letter-spacing: .18em; }
+.admin-department-card strong { font-size: 20px; }
+.admin-department-card small { color: #796b66; font-size: 13px; }
+.admin-department-open { display: flex; justify-content: space-between; width: 100%; margin-top: auto; padding-top: 14px; border-top: 1px solid #f1e7e3; color: #965f59; font-size: 13px; }
+@media (max-width: 640px) {
+  .admin-department-grid { grid-template-columns: 1fr; gap: 12px; }
+  .admin-department-card { min-height: 190px; padding: 22px; }
+  .admin-hub-content { padding-top: 34px; }
+}
