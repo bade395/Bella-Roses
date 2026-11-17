@@ -130,3 +130,8 @@ export function hasStaffPermission(
 ): boolean {
   return staff.permissions.includes(permission);
 }
+
+export async function getStaffUser(permission: StaffPermission): Promise<StaffContext | null> {
+  const staff = await getStaffContext();
+  return staff && hasStaffPermission(staff, permission) ? staff : null;
+}
