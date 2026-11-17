@@ -196,6 +196,8 @@ export default function AdminOrdersPage() {
         <Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link>
         <div className="admin-header-actions">
           <Link className="admin-tables-link" href="/admin">إدارة القائمة</Link>
+          <Link className="admin-tables-link" href="/admin/orders/archive">أرشيف الطلبات</Link>
+          <Link className="admin-tables-link" href="/admin/reports">تقارير المبيعات</Link>
           <Link className="admin-tables-link" href="/admin/tables">الطاولات و QR</Link>
           <Link className="admin-tables-link" href="/admin/orders/display">شاشة عرض الكافيه ↗</Link>
         </div>
