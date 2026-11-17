@@ -5,6 +5,7 @@ import { Channel, Realtime } from "appwrite";
 import { appwriteClient, APPWRITE_DATABASE_ID } from "@/lib/appwrite";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getAllowedNextStatuses } from "@/lib/order-workflow.mjs";
 
 type Order = {
   $id: string; order_number: string; table_id: string; status: string;
@@ -20,11 +21,11 @@ const statusLabels: Record<string, string> = {
   new: "طلب جديد", accepted: "تم القبول", preparing: "قيد التحضير",
   ready: "جاهز للاستلام", served: "تم التقديم", cancelled: "ملغي",
 };
-const statuses = ["new", "accepted", "preparing", "ready", "served", "cancelled"];
 
 export default function AdminOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [staffRole, setStaffRole] = useState<"owner" | "manager" | "cashier" | "kitchen" | "service">("owner");
   const [tables, setTables] = useState<Table[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -63,6 +64,11 @@ export default function AdminOrdersPage() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      const meResponse = await fetch("/api/admin/me", { cache: "no-store" });
+      if (meResponse.status === 401) { router.replace("/admin/login"); return; }
+      const me = await meResponse.json();
+      if (!meResponse.ok) throw new Error(me.error ?? "تعذّر التحقق من الصلاحيات.");
+      setStaffRole(me.staff?.role ?? "owner");
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
       if (response.status === 401) { router.replace("/admin/login"); return; }
       const data = await response.json();
@@ -232,7 +238,7 @@ export default function AdminOrdersPage() {
                 <div className="orders-admin-total">{Number(order.subtotal).toFixed(2)} <small>ر.س</small></div>
                 <label className="orders-admin-status-control">حالة الطلب
                   <select className="admin-order-status" value={order.status} disabled={saving === order.$id} onChange={(event) => void updateStatus(order, event.target.value)}>
-                    {statuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
+                    {[order.status, ...getAllowedNextStatuses(order.status, staffRole)].filter((status, index, all) => all.indexOf(status) === index).map((status) => <option key={status} value={status} disabled={status === order.status}>{statusLabels[status] ?? status}</option>)}
                   </select>
                 </label>
                 <button className="admin-order-detail-button orders-detail-wide" type="button" onClick={() => void openOrder(order.$id)}>عرض تفاصيل الطلب</button>

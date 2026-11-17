@@ -17,6 +17,7 @@ export default function StaffManagementPage() {
   const router=useRouter();
   const [role,setRole]=useState("owner");
   const [canManage,setCanManage]=useState(false);
+  const [authLoading,setAuthLoading]=useState(true);
   const [teamReady,setTeamReady]=useState(false);
   const [rows,setRows]=useState<Staff[]>([]);
   const [email,setEmail]=useState("");
@@ -35,6 +36,7 @@ export default function StaffManagementPage() {
 
   const load=useCallback(async()=>{
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("secret")) return;
+    setAuthLoading(true);
     setError("");
     try {
       const me=await request("/api/admin/me");
@@ -49,6 +51,8 @@ export default function StaffManagementPage() {
       const message=e instanceof Error?e.message:"تعذّر تحميل البيانات.";
       if(message==="Unauthorized") router.replace("/admin/login");
       else setError(message);
+    } finally {
+      setAuthLoading(false);
     }
   },[request,router]);
 
@@ -93,7 +97,7 @@ export default function StaffManagementPage() {
     request("/api/admin/staff/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId,secret,membershipId,teamId})})
       .then(()=>{setNotice("تم قبول الدعوة بنجاح. مرحبًا بك في فريق Bella Roses.");window.history.replaceState({}, "", "/admin/staff");void load();})
       .catch(e=>setError(e instanceof Error?e.message:"تعذّر قبول الدعوة."))
-      .finally(()=>setBusy(false));
+      .finally(()=>{setBusy(false);setAuthLoading(false);});
   },[request,load]);
 
   return <main className="admin-dashboard">
@@ -107,7 +111,7 @@ export default function StaffManagementPage() {
       <p>تحكم في أعضاء الفريق والأدوار الممنوحة لكل موظف.</p>
       {error?<p className="admin-error-banner" role="alert">{error}</p>:null}
       {notice?<p className="admin-notice" role="status">{notice}</p>:null}
-      {!canManage ? <div className="admin-empty-state">دورك الحالي: {roleName(role)}. لا تملك صلاحية إدارة الموظفين.</div> : <>
+      {authLoading ? <div className="admin-empty-state" role="status">جارٍ التحقق من صلاحيات الحساب...</div> : !canManage ? <div className="admin-empty-state">دورك الحالي: {roleName(role)}. لا تملك صلاحية إدارة الموظفين.</div> : <>
         {!teamReady ? <div className="admin-editor">
           <h2>إعداد فريق الموظفين</h2>
           <p>أنشئ فريق Appwrite الخاص بـ Bella Roses. سيصبح حساب المالك الحالي مالك الفريق، ولن تتغير بيانات الطلبات أو المنيو.</p>
