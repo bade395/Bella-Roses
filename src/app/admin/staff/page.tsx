@@ -34,6 +34,7 @@ export default function StaffManagementPage() {
   },[]);
 
   const load=useCallback(async()=>{
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("secret")) return;
     setError("");
     try {
       const me=await request("/api/admin/me");
@@ -90,10 +91,10 @@ export default function StaffManagementPage() {
     if(!userId||!secret||!membershipId||!teamId)return;
     setBusy(true);
     request("/api/admin/staff/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId,secret,membershipId,teamId})})
-      .then(()=>{setNotice("تم قبول الدعوة بنجاح. مرحبًا بك في فريق Bella Roses.");window.history.replaceState({}, "", "/admin/staff");})
+      .then(()=>{setNotice("تم قبول الدعوة بنجاح. مرحبًا بك في فريق Bella Roses.");window.history.replaceState({}, "", "/admin/staff");void load();})
       .catch(e=>setError(e instanceof Error?e.message:"تعذّر قبول الدعوة."))
       .finally(()=>setBusy(false));
-  },[request]);
+  },[request,load]);
 
   return <main className="admin-dashboard">
     <header className="admin-dashboard-header">
