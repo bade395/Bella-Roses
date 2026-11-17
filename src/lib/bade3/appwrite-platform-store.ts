@@ -177,3 +177,48 @@ export async function listTenantRows<T>(
 export function platformDatabaseId(): string {
   return DATABASE_ID;
 }
+
+export async function getTenantMenu(tenantId: string) {
+  if (!tenantId) throw new Error("TENANT_CONTEXT_REQUIRED");
+  const [categories, products] = await Promise.all([
+    listRows<Record<string, unknown>>("categories", [
+      { method: "equal", attribute: "tenant_id", values: [tenantId] },
+      { method: "equal", attribute: "is_active", values: [true] },
+      { method: "orderAsc", attribute: "sort_order" },
+    ]),
+    listRows<Record<string, unknown>>("products", [
+      { method: "equal", attribute: "tenant_id", values: [tenantId] },
+      { method: "equal", attribute: "is_available", values: [true] },
+      { method: "orderAsc", attribute: "sort_order" },
+    ]),
+  ]);
+  return {
+    categories: categories.map((row) => ({ $id: row.$id, ...row.data })),
+    products: products.map((row) => ({ $id: row.$id, ...row.data })),
+  };
+}
+
+export async function findTenantTableByToken(tenantId: string, token: string) {
+  if (!tenantId || !token) throw new Error("TENANT_CONTEXT_REQUIRED");
+  const rows = await listRows<Record<string, unknown>>("restaurant_tables", [
+    { method: "equal", attribute: "tenant_id", values: [tenantId] },
+    { method: "equal", attribute: "qr_token", values: [token] },
+    { method: "equal", attribute: "is_active", values: [true] },
+  ], 1);
+  const row = rows[0];
+  return row ? { $id: row.$id, ...row.data } as Record<string, unknown> & { $id: string } : null;
+}
+
+export async function getTenantOperationalRow<T extends Record<string, unknown>>(
+  tableId: string,
+  tenantId: string,
+  rowId: string,
+): Promise<(T & { $id: string }) | null> {
+  if (!TENANT_TABLES.has(tableId)) throw new Error("UNSUPPORTED_TENANT_TABLE");
+  if (!tenantId || !rowId) throw new Error("TENANT_CONTEXT_REQUIRED");
+  const row = await request<AppwriteRow<T>>(
+    `/tablesdb/${encodeURIComponent(DATABASE_ID)}/tables/${encodeURIComponent(tableId)}/rows/${encodeURIComponent(rowId)}`,
+  ).catch(() => null);
+  if (!row?.data || row.data.tenant_id !== tenantId) return null;
+  return { $id: row.$id, ...row.data } as T & { $id: string };
+}
