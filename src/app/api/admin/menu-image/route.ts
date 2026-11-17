@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { getAdminUser, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   if (!origin || origin !== new URL(request.url).origin) {
     return NextResponse.json({ error: "مصدر الطلب غير موثوق." }, { status: 403 });
   }
-  if (!(await getAdminUser())) {
+  if (!(await getStaffUser("menu.manage"))) {
     return NextResponse.json({ error: "غير مصرح." }, { status: 401 });
   }
 
