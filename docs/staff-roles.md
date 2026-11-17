@@ -40,4 +40,4 @@ When the Team ID is not configured, only the existing immutable admin allowlist 
 
 The default Team ID is `bella-roses-staff`; override it with the server-only `APPWRITE_STAFF_TEAM_ID` environment variable if needed. The owner opens `/admin/staff` and uses **Set up staff team** once. Team creation uses the owner's authenticated Appwrite session, making that account the Team owner. The owner can then send email invitations and manage membership roles from the same page.
 
-Invited staff must sign in with the invited account and accept the invitation at `/admin/staff/accept`. Staff-management endpoints are restricted to the Team owner because Appwrite's membership-management API requires owner privileges.
+Invited staff must sign in with the invited account and accept the invitation at `/admin/staff`. Staff-management endpoints are restricted to the Team owner because Appwrite's membership-management API requires owner privileges.
