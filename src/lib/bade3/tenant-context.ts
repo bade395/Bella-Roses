@@ -31,7 +31,7 @@ export function normalizeHostname(input: string): string {
   if (!candidate || candidate.length > 253 || /[\s/@?#]/.test(candidate)) {
     throw new Error("INVALID_TENANT_HOST");
   }
-  const hostname = candidate.replace(/:\d+$/, "");
+  const hostname = candidate.replace(/:\d+$/, "").replace(/\.$/, "");
   if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostname)) {
     throw new Error("INVALID_TENANT_HOST");
   }
