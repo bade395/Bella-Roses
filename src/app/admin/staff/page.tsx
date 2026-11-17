@@ -97,7 +97,7 @@ export default function StaffManagementPage() {
     request("/api/admin/staff/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId,secret,membershipId,teamId})})
       .then(()=>{setNotice("تم قبول الدعوة بنجاح. مرحبًا بك في فريق Bella Roses.");window.history.replaceState({}, "", "/admin/staff");void load();})
       .catch(e=>setError(e instanceof Error?e.message:"تعذّر قبول الدعوة."))
-      .finally(()=>setBusy(false));
+      .finally(()=>{setBusy(false);setAuthLoading(false);});
   },[request,load]);
 
   return <main className="admin-dashboard">
