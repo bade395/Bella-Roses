@@ -5,7 +5,7 @@ import { getStaffUser, STAFF_ROLES, type StaffRole } from "@/lib/staff-permissio
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const TEAM_ID = process.env.APPWRITE_STAFF_TEAM_ID ?? "";
+const TEAM_ID = process.env.APPWRITE_STAFF_TEAM_ID ?? "bella-roses-staff";
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
