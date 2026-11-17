@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ order: order.payload, items: (items.payload.rows ?? []) as unknown[] }, { headers: { "Cache-Control": "no-store" } });
     }
     const [orders, tables] = await Promise.all([
-      call(`/tablesdb/${DB}/tables/orders/rows?${q({ method: "orderDesc", attribute: "$createdAt" })}&${q({ method: "limit", values: [100] })}`),
+      call(`/tablesdb/${DB}/tables/orders/rows?${q({ method: "notEqual", attribute: "status", values: ["served"] })}&${q({ method: "notEqual", attribute: "status", values: ["cancelled"] })}&${q({ method: "orderDesc", attribute: "$createdAt" })}&${q({ method: "limit", values: [100] })}`),
       call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "limit", values: [100] })}`),
     ]);
     if (!orders.response.ok || !tables.response.ok) throw new Error("LIST");
