@@ -9,7 +9,19 @@ const departments = [
   { href: "/admin/orders/display", icon: "▣", title: "شاشة عرض الطلبات", description: "شاشة متابعة الطلبات داخل الكافيه", tag: "CAFE DISPLAY" },
 ];
 
-export default async function AdminHomePage() {
+type AdminHomePageProps = {
+  searchParams: Promise<{ table?: string | string[] }>;
+};
+
+export default async function AdminHomePage({ searchParams }: AdminHomePageProps) {
+  // Backward compatibility: QR codes printed before the customer menu moved
+  // to /menu still point to /?table=TOKEN. Keep those customer links public.
+  const params = await searchParams;
+  const tableToken = Array.isArray(params.table) ? params.table[0] : params.table;
+  if (tableToken) {
+    redirect(`/menu?table=${encodeURIComponent(tableToken)}`);
+  }
+
   const user = await getAdminUser();
   if (!user) redirect("/admin/login");
 
