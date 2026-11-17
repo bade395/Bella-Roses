@@ -27,7 +27,7 @@ export interface TenantDirectory {
 }
 
 export function normalizeHostname(input: string): string {
-  const candidate = input.trim().toLowerCase().replace(/\.$/, "");
+  const candidate = input.trim().toLowerCase();
   if (!candidate || candidate.length > 253 || /[\s/@?#]/.test(candidate)) {
     throw new Error("INVALID_TENANT_HOST");
   }
