@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   if (!headers) return fail("انتهت جلسة الإدارة.", 401);
   const response = await appwrite(`/teams/${encodeURIComponent(TEAM_ID)}/memberships`, headers, {
     method: "POST",
-    body: JSON.stringify({ email, name, roles: [body.role], url: new URL("/admin/staff/accept", request.url).toString() }),
+    body: JSON.stringify({ email, name, roles: [body.role], url: new URL("/admin/staff", request.url).toString() }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) return fail((payload as {message?:string}).message ?? "تعذّر إرسال الدعوة. تأكد أن الحساب الحالي مالك الفريق.", response.status);
