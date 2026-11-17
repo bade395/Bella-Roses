@@ -31,7 +31,8 @@ function safeMetadata(input: PlatformAuditEvent["metadata"] = {}) {
  * existing shared TablesDB database. The table's metadata column is text.
  */
 export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promise<void> {
-  const endpoint = (process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? "").replace(/\\/+$/, "");
+  const rawEndpoint = process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? "";
+  const endpoint = rawEndpoint.replace(/\/+$/, "");
   const projectId = process.env.APPWRITE_PROJECT_ID ?? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
   const apiKey = process.env.APPWRITE_API_KEY;
   const databaseId =
@@ -43,7 +44,7 @@ export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promis
   if (!endpoint || !projectId || !apiKey) throw new Error("PLATFORM_AUDIT_NOT_CONFIGURED");
 
   const response = await fetch(
-    `${endpoint}/tablesdb/${encodeURIComponent(databaseId)}/tables/${encodeURIComponent(tableId)}/rows`,
+    \`\${endpoint}/tablesdb/\${encodeURIComponent(databaseId)}/tables/\${encodeURIComponent(tableId)}/rows\`,
     {
       method: "POST",
       headers: {
@@ -72,6 +73,6 @@ export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promis
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as { type?: string };
-    throw new Error(`PLATFORM_AUDIT_WRITE_FAILED:${error.type ?? response.status}`);
+    throw new Error(\`PLATFORM_AUDIT_WRITE_FAILED:\${error.type ?? response.status}\`);
   }
 }
