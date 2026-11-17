@@ -25,14 +25,10 @@ function safeMetadata(input: PlatformAuditEvent["metadata"] = {}) {
   return output;
 }
 
-/**
- * Append-only application audit writer.
- * The free-tier deployment stores platform and tenant audit events in the
- * existing shared TablesDB database. The table's metadata column is text.
- */
+/** Append-only audit writer targeting the existing free-tier shared database. */
 export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promise<void> {
   const rawEndpoint = process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? "";
-  const endpoint = rawEndpoint.replace(/\/+$/, "");
+  const endpoint = rawEndpoint.replace(/\\/+$/, "");
   const projectId = process.env.APPWRITE_PROJECT_ID ?? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
   const apiKey = process.env.APPWRITE_API_KEY;
   const databaseId =
@@ -43,36 +39,39 @@ export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promis
 
   if (!endpoint || !projectId || !apiKey) throw new Error("PLATFORM_AUDIT_NOT_CONFIGURED");
 
-  const response = await fetch(
-    \`\${endpoint}/tablesdb/\${encodeURIComponent(databaseId)}/tables/\${encodeURIComponent(tableId)}/rows\`,
-    {
-      method: "POST",
-      headers: {
-        "X-Appwrite-Project": projectId,
-        "X-Appwrite-Key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        rowId: randomUUID(),
-        data: {
-          actor_type: "platform",
-          actor_id: event.actor.id,
-          tenant_id: event.tenantId ?? null,
-          branch_id: event.branchId ?? null,
-          action: event.action.slice(0, 120),
-          resource_type: event.resourceType.slice(0, 80),
-          resource_id: event.resourceId?.slice(0, 128) ?? null,
-          result: event.outcome,
-          metadata: JSON.stringify(safeMetadata(event.metadata)),
-          created_at: new Date().toISOString(),
-        },
-      }),
-      cache: "no-store",
+  const path =
+    endpoint +
+    "/tablesdb/" + encodeURIComponent(databaseId) +
+    "/tables/" + encodeURIComponent(tableId) +
+    "/rows";
+
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "X-Appwrite-Project": projectId,
+      "X-Appwrite-Key": apiKey,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      rowId: randomUUID(),
+      data: {
+        actor_type: "platform",
+        actor_id: event.actor.id,
+        tenant_id: event.tenantId ?? null,
+        branch_id: event.branchId ?? null,
+        action: event.action.slice(0, 120),
+        resource_type: event.resourceType.slice(0, 80),
+        resource_id: event.resourceId?.slice(0, 128) ?? null,
+        result: event.outcome,
+        metadata: JSON.stringify(safeMetadata(event.metadata)),
+        created_at: new Date().toISOString(),
+      },
+    }),
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as { type?: string };
-    throw new Error(\`PLATFORM_AUDIT_WRITE_FAILED:\${error.type ?? response.status}\`);
+    throw new Error("PLATFORM_AUDIT_WRITE_FAILED:" + (error.type ?? response.status));
   }
 }
