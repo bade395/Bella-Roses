@@ -101,7 +101,7 @@ export default function AdminTablesPage() {
   }
 
   function copyQrLink(token: string) {
-    const url = `${origin}/?table=${encodeURIComponent(token)}`;
+    const url = `${origin}/menu?table=${encodeURIComponent(token)}`;
     void navigator.clipboard.writeText(url).then(
       () => setNotice("تم نسخ رابط QR."),
       () => setError("تعذّر نسخ الرابط من المتصفح."),
@@ -157,7 +157,7 @@ export default function AdminTablesPage() {
         ) : (
           <div className="admin-tables-grid">
             {tables.map((table) => {
-              const url = `${origin}/?table=${encodeURIComponent(table.qr_token)}`;
+              const url = `${origin}/menu?table=${encodeURIComponent(table.qr_token)}`;
               return (
                 <article className={table.is_active === false ? "admin-table-card inactive" : "admin-table-card"} key={table.$id}>
                   <div className="admin-table-card-heading">
