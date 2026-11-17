@@ -16,6 +16,7 @@ export default function OrdersDisplayPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [connected, setConnected] = useState(false);
+  const [accessError, setAccessError] = useState("");
   const [now, setNow] = useState(new Date());
 
   const load = useCallback(async () => {
@@ -23,7 +24,9 @@ export default function OrdersDisplayPage() {
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
       if (response.status === 401) { router.replace("/admin/login"); return; }
       const data = await response.json();
-      if (!response.ok) throw new Error("LOAD");
+      if (response.status === 403) { setAccessError("حسابك لا يملك صلاحية عرض شاشة الطلبات."); setConnected(false); return; }
+      if (!response.ok) throw new Error(data.error ?? "تعذّر تحميل الطلبات.");
+      setAccessError("");
       setOrders(data.orders ?? []);
       setTables(data.tables ?? []);
       setConnected(true);
@@ -48,6 +51,7 @@ export default function OrdersDisplayPage() {
         <div className={connected ? "orders-display-connection online" : "orders-display-connection"}>{connected ? "● مباشر" : "● جاري إعادة الاتصال"}</div>
       </header>
       <section className="orders-display-intro"><h1>طلباتكم في بيلا روز</h1><p>تابع رقم طلبك — هنكون سعداء بخدمتك</p></section>
+      {accessError ? <p className="orders-display-empty" role="alert">{accessError}</p> : null}
       <section className="orders-display-columns">
         {columns.map((column) => {
           const matching = activeOrders.filter((order) => column.key === "preparing" ? ["accepted", "preparing"].includes(order.status) : order.status === column.key);
