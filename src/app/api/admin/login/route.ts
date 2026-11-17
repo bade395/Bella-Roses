@@ -134,13 +134,26 @@ export async function POST(request: Request) {
     ? (await userResponse.json().catch(() => null)) as { $id?: string; email?: string } | null
     : null;
 
-  if (!user?.$id || (!isAllowedAdmin(user.$id) && !(process.env.APPWRITE_STAFF_TEAM_ID ?? "bella-roses-staff"))) {
+  let isAuthorized = Boolean(user?.$id && isAllowedAdmin(user.$id));
+  if (user?.$id && !isAuthorized) {
+    const teamId = process.env.APPWRITE_STAFF_TEAM_ID ?? "bella-roses-staff";
+    const query = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "teamId", values: [teamId] }));
+    const membershipsResponse = await fetch(`${APPWRITE_ENDPOINT}/account/memberships?queries[]=${query}`, {
+      headers: { "X-Appwrite-Project": APPWRITE_PROJECT_ID, "X-Appwrite-Session": sessionSecret },
+      cache: "no-store",
+    }).catch(() => null);
+    if (membershipsResponse?.ok) {
+      const result = await membershipsResponse.json().catch(() => ({})) as { memberships?: Array<{teamId?:string;userId?:string;roles?:string[];confirm?:boolean;joined?:string|null}> };
+      isAuthorized = Boolean(result.memberships?.some((item) =>
+        item.teamId === teamId && item.userId === user.$id && item.confirm === true &&
+        Boolean(item.joined) && Array.isArray(item.roles) && item.roles.length > 0
+      ));
+    }
+  }
+  if (!user?.$id || !isAuthorized) {
     await fetch(`${APPWRITE_ENDPOINT}/account/sessions/current`, {
       method: "DELETE",
-      headers: {
-        "X-Appwrite-Project": APPWRITE_PROJECT_ID,
-        "X-Appwrite-Session": sessionSecret,
-      },
+      headers: { "X-Appwrite-Project": APPWRITE_PROJECT_ID, "X-Appwrite-Session": sessionSecret },
       cache: "no-store",
     }).catch(() => undefined);
     return NextResponse.json({ error: "هذا الحساب غير مخوّل بلوحة الإدارة." }, { status: 403 });
