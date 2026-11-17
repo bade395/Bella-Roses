@@ -5,6 +5,7 @@ import {
   APPWRITE_PROJECT_ID,
   isAllowedAdmin,
 } from "@/lib/admin-auth";
+import { STAFF_ROLES } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 
@@ -134,7 +135,51 @@ export async function POST(request: Request) {
     ? (await userResponse.json().catch(() => null)) as { $id?: string; email?: string } | null
     : null;
 
-  if (!user?.$id || !isAllowedAdmin(user.$id)) {
+  let authorized = Boolean(user?.$id && isAllowedAdmin(user.$id));
+
+  // Non-owner staff must have a confirmed membership in the configured Bella Roses Team.
+  const staffTeamId = process.env.APPWRITE_STAFF_TEAM_ID;
+  if (user?.$id && !authorized && staffTeamId) {
+    const membershipQuery = encodeURIComponent(JSON.stringify({
+      method: "equal",
+      attribute: "teamId",
+      values: [staffTeamId],
+    }));
+    try {
+      const membershipsResponse = await fetch(
+        `${APPWRITE_ENDPOINT}/account/memberships?queries[]=${membershipQuery}`,
+        {
+          headers: {
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            "X-Appwrite-Session": sessionSecret,
+          },
+          cache: "no-store",
+        },
+      );
+      if (membershipsResponse.ok) {
+        const payload = await membershipsResponse.json() as {
+          memberships?: Array<{
+            teamId?: string;
+            userId?: string;
+            roles?: string[];
+            confirm?: boolean;
+            joined?: string | null;
+          }>;
+        };
+        authorized = Boolean(payload.memberships?.some((membership) =>
+          membership.teamId === staffTeamId &&
+          membership.userId === user.$id &&
+          membership.confirm === true &&
+          Boolean(membership.joined) &&
+          membership.roles?.some((role) => (STAFF_ROLES as readonly string[]).includes(role))
+        ));
+      }
+    } catch {
+      authorized = false;
+    }
+  }
+
+  if (!user?.$id || !authorized) {
     await fetch(`${APPWRITE_ENDPOINT}/account/sessions/current`, {
       method: "DELETE",
       headers: {
