@@ -30,7 +30,7 @@ test("shared database hostname resolution returns only active verified tenant", 
 });
 
 test("tenant authorization denies cross-tenant membership and branch", () => {
-  const tenant = { id: "tenant-a", slug: "a", status: "active" as const, primaryDomain: "a.example.com" };
+  const tenant = { id: "tenant-a", slug: "a", status: "active", primaryDomain: "a.example.com" };
   assert.equal(authorizeTenantOperation({
     tenant,
     userId: "user-a",
