@@ -73,7 +73,7 @@ export async function PATCH(request: Request) {
     if (!current.response.ok) return fail("الطلب غير موجود.", current.response.status === 404 ? 404 : 502);
     const currentStatus = String(current.payload.status ?? "");
     const allowedNext = getAllowedNextStatuses(currentStatus, staff.role);
-    if (!allowedNext.includes(body.status)) {
+    if (!allowedNext.includes(body.status as (typeof STATUSES)[number])) {
       return fail("انتقال حالة الطلب غير مسموح. حدّث الطلب من حالته الحالية.", 409);
     }
     const result = await call(`/tablesdb/${DB}/tables/orders/rows/${encodeURIComponent(body.id)}`, {
