@@ -5,6 +5,7 @@ import {
   APPWRITE_PROJECT_ID,
   isAllowedAdmin,
 } from "@/lib/admin-auth";
+import { getStaffContext } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 
@@ -134,7 +135,7 @@ export async function POST(request: Request) {
     ? (await userResponse.json().catch(() => null)) as { $id?: string; email?: string } | null
     : null;
 
-  if (!user?.$id || !isAllowedAdmin(user.$id)) {
+  if (!user?.$id || (!isAllowedAdmin(user.$id) && !process.env.APPWRITE_STAFF_TEAM_ID)) {
     await fetch(`${APPWRITE_ENDPOINT}/account/sessions/current`, {
       method: "DELETE",
       headers: {
