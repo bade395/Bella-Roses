@@ -21,7 +21,6 @@ const statusLabels: Record<string, string> = {
   new: "طلب جديد", accepted: "تم القبول", preparing: "قيد التحضير",
   ready: "جاهز للاستلام", served: "تم التقديم", cancelled: "ملغي",
 };
-const statuses = ["new", "accepted", "preparing", "ready", "served", "cancelled"];
 
 export default function AdminOrdersPage() {
   const router = useRouter();
