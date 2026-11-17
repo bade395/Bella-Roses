@@ -9,11 +9,12 @@ export const ORDER_TRANSITIONS = Object.freeze({
 
 const ROLE_TRANSITIONS = Object.freeze({
   kitchen: new Set(["accepted", "preparing", "ready"]),
-  service: new Set(["ready", "served", "cancelled"]),
+  service: new Set(["served", "cancelled"]),
 });
 
 export function getAllowedNextStatuses(currentStatus, role) {
   const next = ORDER_TRANSITIONS[currentStatus] ?? [];
+  if (role === "service" && currentStatus !== "ready") return [];
   const roleAllowed = ROLE_TRANSITIONS[role];
   return roleAllowed ? next.filter((status) => roleAllowed.has(status)) : [...next];
 }
