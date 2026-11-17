@@ -13,7 +13,7 @@ The database name remains `bella_roses` for compatibility with the live applicat
 
 ## New private platform tables created
 
-All nine tables were created inside `bella_roses` with `rowSecurity=true` and empty table-level permissions:
+All thirteen tables were created inside `bella_roses` with `rowSecurity=true` and empty table-level permissions:
 
 | Table | Purpose |
 |---|---|
@@ -26,8 +26,12 @@ All nine tables were created inside `bella_roses` with `rowSecurity=true` and em
 | `subscriptions` | Tenant plan assignment (payment gateway deferred) |
 | `tenant_storage_placements` | Shared/dedicated future storage placement |
 | `audit_events` | Append-only platform audit events |
+| `tenant_settings` | Tenant-owned operational settings |
+| `tenant_branding` | White-label identity and theme configuration |
+| `branch_staff_access` | Branch-level staff membership and roles |
+| `branding_assets` | Tenant-owned asset metadata |
 
-Verified indexes are available for tenant slug, normalized domain, tenant membership, branch code, plan code, subscription tenant/status, tenant storage placement, platform admin identity and audit tenant/time lookups.
+Verified indexes are available for tenant slug, normalized domain, tenant membership, branch code, plan code, subscription tenant/status, tenant storage placement, platform admin identity, audit tenant/time, tenant settings, tenant branding, branch staff access, and tenant-scoped table/order number uniqueness.
 
 ## First tenant seed
 
@@ -36,7 +40,8 @@ Verified indexes are available for tenant slug, normalized domain, tenant member
 - Subscription: `bella-roses-free` — active free plan.
 - Branch: `bella-main` — Main Branch — active/default.
 - Storage placement: `shared`, database `bella_roses`.
-- Tenant owner membership and platform admin registry row were seeded for the existing configured admin identity.
+- Tenant owner membership, branch owner access and platform admin registry row were seeded for the existing configured admin identity.
+- Tenant settings and initial Bella Roses branding records were seeded; `Powered by bade3` is recorded as non-removable.
 - Primary domain `bella-roses.bade3.com` is verified by Vercel and is now active in the tenant domain registry.
 
 ## Legacy tenant ownership migration
@@ -55,7 +60,7 @@ The existing records were backfilled without changing business fields:
 - orders: 10 rows
 - order_items: 14 rows
 
-All these existing rows now belong to tenant `bella-roses`; branch-owned records belong to `bella-main`. Counts were verified before the migration and row updates were individually accepted by Appwrite. A successful `platform.foundation.provisioned` event was also written to the private audit ledger.
+All these existing rows now belong to tenant `bella-roses`; branch-owned records belong to `bella-main`. Counts were verified before the migration and row updates were individually accepted by Appwrite. Successful schema provisioning events were written to the private audit ledger.
 
 Tenant-scoped indexes are available on all five operational tables.
 
