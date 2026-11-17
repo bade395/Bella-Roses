@@ -8,6 +8,15 @@ const ARCHIVED = ["served", "cancelled"];
 
 function fail(message: string, status = 400) { return NextResponse.json({ error: message }, { status }); }
 function q(value: unknown) { return `queries[]=${encodeURIComponent(JSON.stringify(value))}`; }
+function normalizeRows(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((row) => {
+    if (!row || typeof row !== "object") return {};
+    const entry = row as Record<string, unknown>;
+    const data = entry.data;
+    return data && typeof data === "object" ? { ...entry, ...(data as Record<string, unknown>) } : entry;
+  });
+}
 
 async function call(path: string) {
   const key = process.env.APPWRITE_API_KEY;
@@ -16,7 +25,7 @@ async function call(path: string) {
     headers: { "X-Appwrite-Project": APPWRITE_PROJECT_ID, "X-Appwrite-Key": key },
     cache: "no-store",
   });
-  const payload = await response.json().catch(() => ({})) as Record<string, any>;
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
   return { response, payload };
 }
 
@@ -40,10 +49,10 @@ export async function GET(request: Request) {
       call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "limit", values: [100] })}`),
     ]);
     if (!orders.response.ok || !tables.response.ok) throw new Error("ARCHIVE_READ");
-    const rows = Array.isArray(orders.payload.rows) ? orders.payload.rows : [];
+    const rows = normalizeRows(orders.payload.rows);
     return NextResponse.json({
-      orders: rows.map((row: any) => row.data ? { ...row, ...row.data } : row),
-      tables: (tables.payload.rows ?? []).map((row: any) => row.data ? { ...row, ...row.data } : row),
+      orders: rows,
+      tables: normalizeRows(tables.payload.rows),
       total: Number(orders.payload.total ?? 0),
       limit,
       offset,
