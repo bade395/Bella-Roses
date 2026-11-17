@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAdminUser, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ function localDay(value: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return fail("غير مصرح.", 401);
+  if (!(await getStaffUser("reports.read"))) return fail("غير مصرح.", 401);
   const range = Number(new URL(request.url).searchParams.get("days") ?? 7);
   if (![7, 30, 90].includes(range)) return fail("الفترة المطلوبة غير صالحة.");
 

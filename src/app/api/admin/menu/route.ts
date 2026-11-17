@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { getAdminUser, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ function jsonError(message: string, status = 400) {
 async function requireAdmin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin || origin !== new URL(request.url).origin) return null;
-  return getAdminUser();
+  return getStaffUser("menu.manage");
 }
 
 function cleanText(value: unknown, max: number, required = false) {
@@ -71,7 +72,7 @@ function handleError(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return jsonError("غير مصرح.", 401);
+  if (!(await getStaffUser("menu.manage"))) return jsonError("غير مصرح.", 401);
   const { searchParams } = new URL(request.url);
   const kind = searchParams.get("kind");
   if (!validKind(kind)) return jsonError("نوع البيانات غير صالح.");
