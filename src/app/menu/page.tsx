@@ -3,14 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Query, type Models } from "appwrite";
-import {
-  APPWRITE_DATABASE_ID,
-  APPWRITE_TABLES,
-  tablesDB,
-} from "@/lib/appwrite";
 
-type CategoryRow = Models.Row & {
+type CategoryRow = {
   $id: string;
   name_ar: string;
   name_en?: string;
@@ -21,7 +15,7 @@ type CategoryRow = Models.Row & {
 
 type CartLine = { product: ProductRow; quantity: number; notes: string };
 
-type ProductRow = Models.Row & {
+type ProductRow = {
   $id: string;
   category_id: string;
   name_ar: string;
@@ -55,29 +49,14 @@ export default function Home() {
     let mounted = true;
 
     async function loadMenu() {
-      if (!tablesDB) {
-        setLoading(false);
-        setLoadError(true);
-        return;
-      }
-
       try {
-        const [categoryResult, productResult] = await Promise.all([
-          tablesDB.listRows<CategoryRow>({
-            databaseId: APPWRITE_DATABASE_ID,
-            tableId: APPWRITE_TABLES.categories,
-            queries: [Query.equal("is_active", true), Query.orderAsc("sort_order"), Query.limit(100)],
-          }),
-          tablesDB.listRows<ProductRow>({
-            databaseId: APPWRITE_DATABASE_ID,
-            tableId: APPWRITE_TABLES.products,
-            queries: [Query.equal("is_available", true), Query.orderAsc("sort_order"), Query.limit(100)],
-          }),
-        ]);
+        const response = await fetch("/api/tenant/menu", { cache: "no-store" });
+        if (!response.ok) throw new Error("MENU_LOAD_FAILED");
+        const result = await response.json() as { categories?: CategoryRow[]; products?: ProductRow[] };
 
         if (!mounted) return;
-        setCategories(categoryResult.rows);
-        setProducts(productResult.rows);
+        setCategories(Array.isArray(result.categories) ? result.categories : []);
+        setProducts(Array.isArray(result.products) ? result.products : []);
       } catch {
         if (!mounted) return;
         setLoadError(true);
