@@ -19,7 +19,8 @@ export default function TrackOrderPage() {
   const id = params.id;
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [error, setError] = useState("");
-  const [permission, setPermission] = useState("default");
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [notificationMessage, setNotificationMessage] = useState("");
   const previousStatus = useRef<OrderStatus | null>(null);
 
   const refresh = useCallback(async () => {
@@ -32,7 +33,11 @@ export default function TrackOrderPage() {
         const title = next.status === "cancelled" ? "تحديث على طلبك" : "تحديث طلب Bella Roses";
         const message = next.status === "cancelled" ? "نأسف، تم إلغاء الطلب. يرجى التواصل مع فريق الكافيه." : (steps.find((step) => step.key === next.status)?.title ?? "تم تحديث حالة طلبك");
         if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-          new Notification(title, { body: message, icon: "/favicon.ico", tag: id });
+          try {
+            new Notification(title, { body: message, icon: "/brand/rose-mark.webp", tag: id });
+          } catch {
+            // Keep order status refresh independent from notification support.
+          }
         }
       }
       previousStatus.current = next.status;
@@ -44,17 +49,42 @@ export default function TrackOrderPage() {
   }, [id]);
 
   useEffect(() => {
-    if ("Notification" in window) setPermission(Notification.permission);
+    if (!window.isSecureContext || !("Notification" in window) || typeof Notification.requestPermission !== "function") {
+      setPermission("unsupported");
+    } else {
+      setPermission(Notification.permission);
+    }
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
   }, [refresh]);
 
   async function enableNotifications() {
-    if (!("Notification" in window)) { setPermission("unsupported"); return; }
-    const result = await Notification.requestPermission();
-    setPermission(result);
-    if (result === "granted") new Notification("Bella Roses", { body: "سننبهك عند تحديث حالة طلبك." });
+    setNotificationMessage("");
+    if (!window.isSecureContext || !("Notification" in window) || typeof Notification.requestPermission !== "function") {
+      setPermission("unsupported");
+      setNotificationMessage("هذا المتصفح لا يدعم إشعارات الويب هنا. افتح رابط المتابعة في متصفح حديث.");
+      return;
+    }
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      if (result === "granted") {
+        try {
+          new Notification("Bella Roses", { body: "تم تفعيل الإشعارات. سننبهك عند تحديث حالة طلبك ما دامت صفحة المتابعة مفتوحة.", icon: "/brand/rose-mark.webp", tag: "bella-order-" + id });
+          setNotificationMessage("تم السماح بالإشعارات بنجاح. اترك صفحة متابعة الطلب مفتوحة لتصلك التحديثات.");
+        } catch {
+          setNotificationMessage("المتصفح حفظ إذن الإشعارات، لكنه لا يعرضها من هذه الصفحة. جرّب فتح الرابط في متصفح آخر.");
+        }
+      } else if (result === "denied") {
+        setNotificationMessage("تم حظر الإشعارات من المتصفح. غيّر إذن الإشعارات لهذا الموقع من إعدادات المتصفح ثم أعد المحاولة.");
+      } else {
+        setNotificationMessage("لم يتم منح الإذن بعد. اضغط تفعيل الإشعارات واختر سماح.");
+      }
+    } catch {
+      setNotificationMessage("تعذّر طلب الإذن. تأكد من فتح الموقع عبر HTTPS ومن إعدادات الإشعارات في المتصفح.");
+      if ("Notification" in window) setPermission(Notification.permission);
+    }
   }
 
   const currentIndex = order ? steps.findIndex((step) => step.key === order.status) : -1;
@@ -85,9 +115,10 @@ export default function TrackOrderPage() {
           </div>
           <div className="track-notify">
             <div><strong>خليك على اطلاع</strong><small>فعّل إشعارات المتصفح لتصلك تحديثات الحالة أثناء متابعة الصفحة.</small></div>
-            <button type="button" onClick={() => void enableNotifications()} disabled={permission === "granted"}>{permission === "granted" ? "الإشعارات مفعّلة ✓" : permission === "denied" ? "فعّلها من إعدادات المتصفح" : "تفعيل الإشعارات"}</button>
+            <button type="button" onClick={() => void enableNotifications()} disabled={permission === "granted" || permission === "unsupported"}>{permission === "granted" ? "الإشعارات مفعّلة ✓" : permission === "denied" ? "راجع إعدادات المتصفح" : permission === "unsupported" ? "غير مدعومة على هذا المتصفح" : "تفعيل الإشعارات"}</button>
           </div>
-          <p className="track-refresh-note">يتم تحديث الحالة تلقائيًا كل 5 ثوانٍ ما دامت صفحة المتابعة مفتوحة.</p>
+          {notificationMessage ? <p className="track-refresh-note" role="status" aria-live="polite">{notificationMessage}</p> : null}
+          <p className="track-refresh-note">تُحدّث الحالة كل 5 ثوانٍ، وتظهر إشعارات التغيير أثناء بقاء صفحة المتابعة مفتوحة.</p>
         </> : !error ? <div className="admin-empty-state">جارٍ تحميل تفاصيل طلبك...</div> : null}
         <Link className="track-home-link" href="/menu">العودة إلى قائمة Bella Roses</Link>
       </section>
