@@ -20,7 +20,7 @@ export default async function AdminHomePage() {
         <div className="admin-header-actions">
           <span className="admin-user-email">{user.email}</span>
           <Link className="admin-tables-link" href="/menu" target="_blank">معاينة صفحة العميل ↗</Link>
-          <form action="/api/admin/logout" method="post"><button className="admin-logout" type="submit">تسجيل الخروج</button></form>
+          <Link className="admin-tables-link" href="/admin">إدارة القائمة</Link>
         </div>
       </header>
       <section className="admin-dashboard-content admin-hub-content">
