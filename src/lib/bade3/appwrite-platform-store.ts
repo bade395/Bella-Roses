@@ -222,3 +222,16 @@ export async function getTenantOperationalRow<T extends Record<string, unknown>>
   if (!row?.data || row.data.tenant_id !== tenantId) return null;
   return { $id: row.$id, ...row.data } as T & { $id: string };
 }
+
+export async function getTenantBranchAccess(tenantId: string, userId: string) {
+  if (!tenantId || !userId) return [];
+  const rows = await listRows<Record<string, unknown>>("branch_staff_access", [
+    { method: "equal", attribute: "tenant_id", values: [tenantId] },
+    { method: "equal", attribute: "user_id", values: [userId] },
+    { method: "equal", attribute: "status", values: ["active"] },
+  ], 100);
+  return rows
+    .map((row) => row.data)
+    .filter((data) => data.tenant_id === tenantId && typeof data.branch_id === "string")
+    .map((data) => ({ branchId: String(data.branch_id), role: String(data.role ?? "") }));
+}
