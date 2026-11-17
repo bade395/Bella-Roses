@@ -5,6 +5,8 @@ import { getAdminUser } from "@/lib/admin-auth";
 const departments = [
   { href: "/admin", icon: "✿", title: "إدارة المنيو", description: "المنتجات والتصنيفات والأسعار", tag: "MENU" },
   { href: "/admin/orders", icon: "⌁", title: "إدارة الطلبات", description: "استقبال الطلبات ومتابعة حالتها", tag: "ORDERS" },
+  { href: "/admin/orders/archive", icon: "▤", title: "أرشيف الطلبات", description: "الطلبات المقدّمة والملغاة وسجل تفاصيلها", tag: "ORDER ARCHIVE" },
+  { href: "/admin/reports", icon: "▥", title: "تقارير المبيعات", description: "ملخصات يومية وقيمة الطلبات المقدّمة", tag: "REPORTS" },
   { href: "/admin/tables", icon: "▦", title: "الطاولات ورموز QR", description: "إدارة الطاولات وروابط قوائم العملاء", tag: "TABLES & QR" },
   { href: "/admin/orders/display", icon: "▣", title: "شاشة عرض الطلبات", description: "شاشة متابعة الطلبات داخل الكافيه", tag: "CAFE DISPLAY" },
 ];
