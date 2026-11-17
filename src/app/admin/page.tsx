@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-type AdminUser = { id: string; email: string; name: string };
+type AdminUser = { id: string; email: string; name: string; permissions: string[] };
 type Category = {
   $id: string; name_ar: string; name_en: string; description_ar?: string;
   description_en?: string; image_id?: string; is_active?: boolean; sort_order?: number;
@@ -94,9 +94,9 @@ export default function AdminHomePage() {
     fetch("/api/admin/me", { cache: "no-store" })
       .then(async response => {
         if (!response.ok) throw new Error("Unauthorized");
-        return response.json() as Promise<{ user: AdminUser }>;
+        return response.json() as Promise<{ user: Omit<AdminUser, "permissions">; staff: { permissions: string[] } }>;
       })
-      .then(result => { if (active) setUser(result.user); })
+      .then(result => { if (!active) return; const permissions = result.staff?.permissions ?? []; if (!permissions.includes("menu.manage")) { router.replace("/admin/orders"); return; } setUser({ ...result.user, permissions }); })
       .catch(() => { router.replace("/admin/login"); })
       .finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
@@ -259,7 +259,7 @@ export default function AdminHomePage() {
   return <main className="admin-dashboard">
     <header className="admin-dashboard-header">
       <Link className="admin-auth-brand" href="/">BELLA ROSES <span>✿</span></Link>
-      <div className="admin-header-actions"><span className="admin-user-email">{user.email}</span><Link className="admin-tables-link" href="/admin/orders">إدارة الطلبات</Link><Link className="admin-tables-link" href="/admin/orders/archive">أرشيف الطلبات</Link><Link className="admin-tables-link" href="/admin/reports">تقارير المبيعات</Link><Link className="admin-tables-link" href="/admin/tables">إدارة الطاولات و QR</Link><Link className="admin-tables-link" href="/admin/staff">إدارة الموظفين</Link><button onClick={logout} className="admin-logout">تسجيل الخروج</button></div>
+      <div className="admin-header-actions"><span className="admin-user-email">{user.email}</span>{user.permissions.includes("orders.read") ? <Link className="admin-tables-link" href="/admin/orders">إدارة الطلبات</Link> : null}{user.permissions.includes("orders.read") ? <Link className="admin-tables-link" href="/admin/orders/archive">أرشيف الطلبات</Link> : null}{user.permissions.includes("reports.read") ? <Link className="admin-tables-link" href="/admin/reports">تقارير المبيعات</Link> : null}{user.permissions.includes("tables.manage") ? <Link className="admin-tables-link" href="/admin/tables">إدارة الطاولات و QR</Link> : null}{user.permissions.includes("staff.manage") ? <Link className="admin-tables-link" href="/admin/staff">إدارة الموظفين</Link> : null}<button onClick={logout} className="admin-logout">تسجيل الخروج</button></div>
     </header>
     <section className="admin-dashboard-content admin-menu-content">
       <p className="admin-auth-eyebrow">BELLA ROSES CONTROL CENTER</p>
