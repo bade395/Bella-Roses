@@ -5,7 +5,6 @@ import {
   APPWRITE_PROJECT_ID,
   isAllowedAdmin,
 } from "@/lib/admin-auth";
-import { getStaffContext } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 
