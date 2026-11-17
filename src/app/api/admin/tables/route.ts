@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes, randomUUID } from "node:crypto";
-import { getAdminUser, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ async function isSameOrigin(request: Request) {
 }
 
 export async function GET() {
-  const admin = await getAdminUser();
+  const admin = await getStaffUser("tables.manage");
   if (!admin) return jsonError("يلزم تسجيل الدخول لإدارة الطاولات.", 401);
 
   try {
@@ -74,7 +75,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!(await isSameOrigin(request))) return jsonError("طلب غير مسموح.", 403);
-  const admin = await getAdminUser();
+  const admin = await getStaffUser("tables.manage");
   if (!admin) return jsonError("انتهت جلسة الإدارة. سجّل الدخول مجددًا.", 401);
 
   const body = await request.json().catch(() => null) as { table_number?: unknown; label?: unknown } | null;
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!(await isSameOrigin(request))) return jsonError("طلب غير مسموح.", 403);
-  const admin = await getAdminUser();
+  const admin = await getStaffUser("tables.manage");
   if (!admin) return jsonError("انتهت جلسة الإدارة. سجّل الدخول مجددًا.", 401);
 
   const body = await request.json().catch(() => null) as {
