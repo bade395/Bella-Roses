@@ -28,7 +28,8 @@ function safeMetadata(input: PlatformAuditEvent["metadata"] = {}) {
 /** Append-only audit writer targeting the existing free-tier shared database. */
 export async function writePlatformAuditEvent(event: PlatformAuditEvent): Promise<void> {
   const rawEndpoint = process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? "";
-  const endpoint = rawEndpoint.replace(/\\/+$/, "");
+  let endpoint = rawEndpoint;
+  while (endpoint.endsWith("/")) endpoint = endpoint.slice(0, -1);
   const projectId = process.env.APPWRITE_PROJECT_ID ?? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
   const apiKey = process.env.APPWRITE_API_KEY;
   const databaseId =
