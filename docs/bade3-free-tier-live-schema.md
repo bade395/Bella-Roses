@@ -37,7 +37,7 @@ Verified indexes are available for tenant slug, normalized domain, tenant member
 - Branch: `bella-main` — Main Branch — active/default.
 - Storage placement: `shared`, database `bella_roses`.
 - Tenant owner membership and platform admin registry row were seeded for the existing configured admin identity.
-- Primary domain `bella-roses.bade3.com` is deliberately `pending` and inactive; it must not route tenants until domain verification is completed.
+- Primary domain `bella-roses.bade3.com` is verified by Vercel and is now active in the tenant domain registry.
 
 ## Legacy tenant ownership migration
 
@@ -55,7 +55,7 @@ The existing records were backfilled without changing business fields:
 - orders: 10 rows
 - order_items: 14 rows
 
-All these existing rows now belong to tenant `bella-roses`; branch-owned records belong to `bella-main`. Counts were verified before the migration and row updates were individually accepted by Appwrite.
+All these existing rows now belong to tenant `bella-roses`; branch-owned records belong to `bella-main`. Counts were verified before the migration and row updates were individually accepted by Appwrite. A successful `platform.foundation.provisioned` event was also written to the private audit ledger.
 
 Tenant-scoped indexes are available on all five operational tables.
 
@@ -63,7 +63,7 @@ Tenant-scoped indexes are available on all five operational tables.
 
 This schema work does **not** enable multi-tenant routing. Existing legacy customer APIs still need route-by-route changes to inject the server-resolved tenant ID into reads and writes, verify branch ownership and validate related records. Do not onboard a second live tenant until those changes and cross-tenant integration tests are complete.
 
-The primary domain is inactive pending verification. The Platform Owner API requires the server-only `BADE3_PLATFORM_OWNER_USER_IDS` environment variable to be configured in the deployment environment.
+The primary domain is verified and active. Vercel Production, Preview and Development now have `BADE3_CORE_DATABASE_ID=bella_roses`, `BADE3_PLATFORM_OWNER_USER_IDS` set to the existing Platform Owner Appwrite user ID, and `BADE3_AUDIT_EVENTS_TABLE_ID=audit_events`. These settings are server-side; the owner allowlist is stored as a sensitive environment variable.
 
 ## Rollback posture
 
