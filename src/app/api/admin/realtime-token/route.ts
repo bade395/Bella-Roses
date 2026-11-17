@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { getAdminUser, ADMIN_SESSION_COOKIE, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { getStaffUser } from "@/lib/staff-permissions";
 import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = await getAdminUser();
+  const user = await getStaffUser("orders.read");
   if (!user) return NextResponse.json({ error: "غير مصرح." }, { status: 401 });
 
   const cookieStore = await cookies();
