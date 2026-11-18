@@ -70,7 +70,7 @@ export async function GET() {
       console.error("Appwrite table list failed", { status: response.status });
       return jsonError("تعذّر تحميل الطاولات من قاعدة البيانات.", 502);
     }
-    const rows = Array.isArray(payload.rows) ? payload.rows.map((raw) => {
+    const rows = Array.isArray(payload.rows) ? payload.rows.map((raw: unknown) => {
       const row = raw as Record<string, unknown>;
       const data = row.data && typeof row.data === "object" ? row.data as Record<string, unknown> : {};
       return { ...row, ...data } as TableRow;
