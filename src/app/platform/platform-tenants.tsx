@@ -11,6 +11,13 @@ type Tenant = {
   timezone?: string;
 };
 
+type TenantPage = {
+  tenants?: Tenant[];
+  total?: number;
+  totalPages?: number;
+  error?: string;
+};
+
 function statusLabel(status?: string) {
   if (status === "active") return "نشطة";
   if (status === "suspended") return "موقوفة";
@@ -20,17 +27,23 @@ function statusLabel(status?: string) {
 
 export default function PlatformTenants() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadTenants = useCallback(async () => {
+  const loadTenants = useCallback(async (targetPage: number) => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/platform/tenants", { cache: "no-store" });
-      const payload = await response.json() as { tenants?: Tenant[]; error?: string };
+      const response = await fetch(`/api/platform/tenants?page=${targetPage}`, { cache: "no-store" });
+      const payload = await response.json() as TenantPage;
       if (!response.ok) throw new Error(payload.error || "تعذّر تحميل الشركات.");
       setTenants(Array.isArray(payload.tenants) ? payload.tenants : []);
+      setPage(Number.isInteger(payload.totalPages) ? targetPage : 1);
+      setTotal(Number.isFinite(payload.total) ? Number(payload.total) : 0);
+      setTotalPages(Number.isInteger(payload.totalPages) ? Math.max(1, Number(payload.totalPages)) : 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "حدث خطأ غير متوقع.");
     } finally {
@@ -38,7 +51,7 @@ export default function PlatformTenants() {
     }
   }, []);
 
-  useEffect(() => { void loadTenants(); }, [loadTenants]);
+  useEffect(() => { void loadTenants(1); }, [loadTenants]);
 
   return (
     <section className="space-y-5">
@@ -49,7 +62,7 @@ export default function PlatformTenants() {
         </div>
         <button
           type="button"
-          onClick={() => void loadTenants()}
+          onClick={() => void loadTenants(page)}
           disabled={loading}
           className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
         >
@@ -67,10 +80,10 @@ export default function PlatformTenants() {
         <div className="grid grid-cols-2 gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-3">
           <div>
             <p className="text-xs text-slate-500">إجمالي الشركات</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{loading ? "—" : tenants.length}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{loading ? "—" : total}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500">الشركات النشطة</p>
+            <p className="text-xs text-slate-500">النشطة في الصفحة</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">{loading ? "—" : tenants.filter((tenant) => tenant.status === "active").length}</p>
           </div>
           <div className="col-span-2 sm:col-span-1">
@@ -101,6 +114,26 @@ export default function PlatformTenants() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => void loadTenants(page - 1)}
+          disabled={loading || page <= 1}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 disabled:opacity-40"
+        >
+          السابق
+        </button>
+        <p className="text-xs tabular-nums text-slate-500">صفحة {page} من {totalPages}</p>
+        <button
+          type="button"
+          onClick={() => void loadTenants(page + 1)}
+          disabled={loading || page >= totalPages}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 disabled:opacity-40"
+        >
+          التالي
+        </button>
       </div>
 
       <p className="text-xs leading-6 text-slate-500">
