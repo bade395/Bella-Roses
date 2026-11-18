@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { randomUUID, randomInt } from "node:crypto";
 import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from "@/lib/admin-auth";
+import { findTenantTableByToken, getTenantOperationalRow, isActiveTenantBranch, resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
+const DATABASE_ID = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
 const MAX_ITEMS = 30;
 
 type ProductRow = {
@@ -46,10 +47,10 @@ function text(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-async function createOrderNumber() {
+async function createOrderNumber(tenantId: string) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const candidate = `BELLA-${randomInt(100000, 1000000)}`;
-    const existing = await appwrite(`/tablesdb/${DATABASE_ID}/tables/orders/rows?${queryParam({ method: "equal", attribute: "order_number", values: [candidate] })}&${queryParam({ method: "limit", values: [1] })}`);
+    const existing = await appwrite(`/tablesdb/${DATABASE_ID}/tables/orders/rows?${queryParam({ method: "equal", attribute: "tenant_id", values: [tenantId] })}&${queryParam({ method: "equal", attribute: "order_number", values: [candidate] })}&${queryParam({ method: "limit", values: [1] })}`);
     if (!existing.response.ok) throw new Error("ORDER_NUMBER_CHECK");
     if (!Array.isArray(existing.payload.rows) || existing.payload.rows.length === 0) return candidate;
   }
@@ -86,27 +87,24 @@ export async function POST(request: Request) {
   const orderNotes = text(body.notes, 1500);
 
   try {
-    const tableQuery = [
-      queryParam({ method: "equal", attribute: "qr_token", values: [token] }),
-      queryParam({ method: "equal", attribute: "is_active", values: [true] }),
-      queryParam({ method: "limit", values: [1] }),
-    ].join("&");
-    const tableResult = await appwrite(`/tablesdb/${DATABASE_ID}/tables/restaurant_tables/rows?${tableQuery}`);
-    if (!tableResult.response.ok) throw new Error("TABLE_LOOKUP");
-    const tableRows = (tableResult.payload.rows ?? []) as Array<{ $id: string; table_number: number; label?: string }>;
-    const table = tableRows[0];
-    if (!table) return error("رمز الطاولة غير صالح أو أن الطاولة غير مفعّلة.", 404);
+    const tenant = await resolveTenantForHost(request.headers.get("host"));
+    if (!tenant) return error("المطعم غير متاح لهذا النطاق.", 404);
 
-    const settingsResult = await appwrite(`/tablesdb/${DATABASE_ID}/tables/restaurant_settings/rows/main`);
+    const table = await findTenantTableByToken(tenant.id, token) as
+      | ({ $id: string; table_number?: number; label?: string; branch_id?: string } & Record<string, unknown>)
+      | null;
+    if (!table || typeof table.branch_id !== "string") return error("رمز الطاولة غير صالح أو أن الطاولة غير مفعّلة.", 404);
+    if (!(await isActiveTenantBranch(tenant.id, table.branch_id))) return error("الفرع غير متاح حاليًا.", 409);
+
+    const settingsResult = await appwrite(`/tablesdb/${DATABASE_ID}/tables/tenant_settings/rows/${encodeURIComponent(tenant.id)}`);
     if (!settingsResult.response.ok) throw new Error("SETTINGS_LOOKUP");
-    const settings = settingsResult.payload as { ordering_enabled?: boolean };
-    if (settings?.ordering_enabled !== true) return error("الطلب الإلكتروني متوقف حاليًا. يرجى طلب المساعدة من فريق المطعم.", 409);
+    const settingsPayload = settingsResult.payload as { data?: { ordering_enabled?: boolean }; ordering_enabled?: boolean };
+    const orderingEnabled = settingsPayload.data?.ordering_enabled ?? settingsPayload.ordering_enabled;
+    if (orderingEnabled !== true) return error("الطلب الإلكتروني متوقف حاليًا. يرجى طلب المساعدة من فريق المطعم.", 409);
 
     const products = await Promise.all([...requested.entries()].map(async ([id, details]) => {
-      const result = await appwrite(`/tablesdb/${DATABASE_ID}/tables/products/rows/${encodeURIComponent(id)}`);
-      if (!result.response.ok) return null;
-      const data = result.payload as unknown as ProductRow;
-      return data.$id && data.is_available !== false && Number.isFinite(Number(data.price))
+      const data = await getTenantOperationalRow<ProductRow>("products", tenant.id, id);
+      return data?.$id && data.is_available !== false && Number.isFinite(Number(data.price))
         ? { product: data, ...details }
         : null;
     }));
@@ -116,21 +114,22 @@ export async function POST(request: Request) {
 
     const categoryIds = [...new Set(products.map((item) => item!.product.category_id))];
     const categories = await Promise.all(categoryIds.map(async (id) => {
-      const result = await appwrite(`/tablesdb/${DATABASE_ID}/tables/categories/rows/${encodeURIComponent(id)}`);
-      return result.response.ok ? result.payload as { is_active?: boolean } : null;
+      return getTenantOperationalRow<{ is_active?: boolean }>("categories", tenant.id, id);
     }));
     if (categories.some((category) => !category || category.is_active === false)) {
       return error("أحد تصنيفات المنتجات لم يعد متاحًا. حدّث القائمة وحاول مجددًا.", 409);
     }
 
     const orderId = randomUUID();
-    const orderNumber = await createOrderNumber();
+    const orderNumber = await createOrderNumber(tenant.id);
     const itemRows = products.map((entry) => {
       const { product, quantity, notes } = entry!;
       const unitPrice = Math.round(Number(product.price) * 100) / 100;
       return {
         rowId: randomUUID(),
         data: {
+          tenant_id: tenant.id,
+          branch_id: table.branch_id,
           order_id: orderId,
           product_id: product.$id,
           product_name_ar: product.name_ar,
@@ -160,6 +159,8 @@ export async function POST(request: Request) {
         tableId: "orders",
         rowId: orderId,
         data: {
+          tenant_id: tenant.id,
+          branch_id: table.branch_id,
           order_number: orderNumber,
           table_id: table.$id,
           status: "new",

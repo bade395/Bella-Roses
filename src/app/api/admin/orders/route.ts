@@ -5,7 +5,7 @@ import { getAllowedNextStatuses } from "@/lib/order-workflow.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const DB = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
+const DB = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
 const STATUSES = ["new", "accepted", "preparing", "ready", "served", "cancelled"] as const;
 
 function fail(message: string, status = 400) { return NextResponse.json({ error: message }, { status }); }
@@ -27,22 +27,34 @@ async function call(path: string, init: RequestInit = {}) {
 function q(value: unknown) { return `queries[]=${encodeURIComponent(JSON.stringify(value))}`; }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("orders.read"))) return fail("غير مصرح أو لا تملك صلاحية قراءة الطلبات.", 403);
+  const staff = await getStaffUser("orders.read");
+  if (!staff) return fail("غير مصرح أو لا تملك صلاحية قراءة الطلبات.", 403);
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (id) {
       if (!/^[A-Za-z0-9._-]{1,36}$/.test(id)) return fail("رقم الطلب غير صالح.");
       const [order, items] = await Promise.all([
         call(`/tablesdb/${DB}/tables/orders/rows/${encodeURIComponent(id)}`),
-        call(`/tablesdb/${DB}/tables/order_items/rows?${q({ method: "equal", attribute: "order_id", values: [id] })}&${q({ method: "limit", values: [100] })}`),
+        call(`/tablesdb/${DB}/tables/order_items/rows?${q({ method: "equal", attribute: "tenant_id", values: [staff.tenantId] })}&${q({ method: "equal", attribute: "order_id", values: [id] })}&${q({ method: "limit", values: [100] })}`),
       ]);
       if (!order.response.ok) return fail("الطلب غير موجود.", 404);
       if (!items.response.ok) throw new Error("ITEMS");
-      return NextResponse.json({ order: order.payload, items: (items.payload.rows ?? []) as unknown[] }, { headers: { "Cache-Control": "no-store" } });
+      const orderData = order.payload.data && typeof order.payload.data === "object"
+        ? order.payload.data as Record<string, unknown>
+        : order.payload;
+      if (orderData.tenant_id !== staff.tenantId || typeof orderData.branch_id !== "string" || !staff.branchIds.includes(orderData.branch_id)) {
+        return fail("الطلب غير موجود.", 404);
+      }
+      const itemRows = (items.payload.rows ?? []) as Array<Record<string, unknown>>;
+      const scopedItems = itemRows.filter((row) => {
+        const data = row.data && typeof row.data === "object" ? row.data as Record<string, unknown> : row;
+        return data.tenant_id === staff.tenantId && data.branch_id === orderData.branch_id;
+      });
+      return NextResponse.json({ order: order.payload, items: scopedItems }, { headers: { "Cache-Control": "no-store" } });
     }
     const [orders, tables] = await Promise.all([
-      call(`/tablesdb/${DB}/tables/orders/rows?${q({ method: "notEqual", attribute: "status", values: ["served"] })}&${q({ method: "notEqual", attribute: "status", values: ["cancelled"] })}&${q({ method: "orderDesc", attribute: "$createdAt" })}&${q({ method: "limit", values: [100] })}`),
-      call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "limit", values: [100] })}`),
+      call(`/tablesdb/${DB}/tables/orders/rows?${q({ method: "equal", attribute: "tenant_id", values: [staff.tenantId] })}&${q({ method: "equal", attribute: "branch_id", values: staff.branchIds })}&${q({ method: "notEqual", attribute: "status", values: ["served"] })}&${q({ method: "notEqual", attribute: "status", values: ["cancelled"] })}&${q({ method: "orderDesc", attribute: "$createdAt" })}&${q({ method: "limit", values: [100] })}`),
+      call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "equal", attribute: "tenant_id", values: [staff.tenantId] })}&${q({ method: "equal", attribute: "branch_id", values: staff.branchIds })}&${q({ method: "limit", values: [100] })}`),
     ]);
     if (!orders.response.ok || !tables.response.ok) throw new Error("LIST");
     return NextResponse.json({ orders: (orders.payload.rows ?? []) as unknown[], tables: (tables.payload.rows ?? []) as unknown[] }, { headers: { "Cache-Control": "no-store" } });
@@ -71,7 +83,13 @@ export async function PATCH(request: Request) {
   try {
     const current = await call(`/tablesdb/${DB}/tables/orders/rows/${encodeURIComponent(body.id)}`);
     if (!current.response.ok) return fail("الطلب غير موجود.", current.response.status === 404 ? 404 : 502);
-    const currentStatus = String(current.payload.status ?? "");
+    const currentData = current.payload.data && typeof current.payload.data === "object"
+      ? current.payload.data as Record<string, unknown>
+      : current.payload;
+    if (currentData.tenant_id !== staff.tenantId || typeof currentData.branch_id !== "string" || !staff.branchIds.includes(currentData.branch_id)) {
+      return fail("الطلب غير موجود.", 404);
+    }
+    const currentStatus = String(currentData.status ?? "");
     const allowedNext = getAllowedNextStatuses(currentStatus, staff.role);
     if (!allowedNext.includes(body.status as (typeof STATUSES)[number])) {
       return fail("انتقال حالة الطلب غير مسموح. حدّث الطلب من حالته الحالية.", 409);

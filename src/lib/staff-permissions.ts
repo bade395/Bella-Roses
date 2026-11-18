@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { cookies, headers as requestHeaders } from "next/headers";
+import { getActiveTenantMembership, getTenantBranchAccess, resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
 import {
   ADMIN_SESSION_COOKIE,
   APPWRITE_ENDPOINT,
@@ -34,6 +35,8 @@ export type StaffContext = {
   role: StaffRole;
   membershipId: string | null;
   permissions: readonly StaffPermission[];
+  tenantId: string;
+  branchIds: string[];
 };
 
 type AppwriteUser = { $id?: string; email?: string; name?: string };
@@ -76,14 +79,25 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   const user = (await userResponse.json()) as AppwriteUser;
   if (!user.$id) return null;
 
+  const incomingHeaders = await requestHeaders();
+  const tenant = await resolveTenantForHost(incomingHeaders.get("host"));
+  if (!tenant) return null;
+  const tenantMembership = await getActiveTenantMembership(tenant.id, user.$id);
+  if (!tenantMembership || !isStaffRole(tenantMembership.role)) return null;
+  const branchAccess = await getTenantBranchAccess(tenant.id, user.$id);
+  const branchIds = branchAccess.map((entry) => entry.branchId);
+  if (branchIds.length === 0) return null;
+
   if (isAllowedAdmin(user.$id)) {
     return {
       id: user.$id,
       email: user.email ?? "",
       name: user.name ?? "",
-      role: "owner",
+      role: tenantMembership.role,
       membershipId: null,
-      permissions: ROLE_PERMISSIONS.owner,
+      permissions: ROLE_PERMISSIONS[tenantMembership.role],
+      tenantId: tenant.id,
+      branchIds,
     };
   }
 
@@ -111,8 +125,9 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   );
   if (!membership?.$id || !Array.isArray(membership.roles)) return null;
 
-  const role = membership.roles.find(isStaffRole);
-  if (!role) return null;
+  const teamRole = membership.roles.find(isStaffRole);
+  if (!teamRole || teamRole !== tenantMembership.role) return null;
+  const role = tenantMembership.role;
 
   return {
     id: user.$id,
@@ -121,6 +136,8 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     role,
     membershipId: membership.$id,
     permissions: ROLE_PERMISSIONS[role],
+    tenantId: tenant.id,
+    branchIds,
   };
 }
 

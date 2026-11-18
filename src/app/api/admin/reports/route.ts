@@ -4,7 +4,7 @@ import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const DB = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
+const DB = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
 const PAGE_SIZE = 100;
 const MAX_ROWS = 5000;
 
@@ -38,7 +38,8 @@ function localDay(value: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("reports.read"))) return fail("غير مصرح.", 401);
+  const staff = await getStaffUser("reports.read");
+  if (!staff) return fail("غير مصرح.", 401);
   const range = Number(new URL(request.url).searchParams.get("days") ?? 7);
   if (![7, 30, 90].includes(range)) return fail("الفترة المطلوبة غير صالحة.");
 
@@ -48,6 +49,8 @@ export async function GET(request: Request) {
     const rows: Record<string, unknown>[] = [];
     for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
       const queries = [
+        q({ method: "equal", attribute: "tenant_id", values: [staff.tenantId] }),
+        q({ method: "equal", attribute: "branch_id", values: staff.branchIds }),
         q({ method: "greaterThanEqual", attribute: "$createdAt", values: [start.toISOString()] }),
         q({ method: "lessThanEqual", attribute: "$createdAt", values: [end.toISOString()] }),
         q({ method: "orderDesc", attribute: "$createdAt" }),

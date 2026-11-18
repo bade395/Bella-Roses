@@ -6,7 +6,7 @@ import { getStaffUser } from "@/lib/staff-permissions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
+const DATABASE_ID = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
 const TABLE_ID = "restaurant_tables";
 
 type TableRow = {
@@ -15,6 +15,8 @@ type TableRow = {
   label?: string | null;
   qr_token: string;
   is_active?: boolean;
+  tenant_id: string;
+  branch_id: string;
 };
 
 function jsonError(message: string, status = 400) {
@@ -55,6 +57,8 @@ export async function GET() {
 
   try {
     const queries = [
+      { method: "equal", attribute: "tenant_id", values: [admin.tenantId] },
+      { method: "equal", attribute: "branch_id", values: admin.branchIds },
       { method: "orderAsc", attribute: "table_number" },
       { method: "limit", values: [100] },
     ];
@@ -66,7 +70,12 @@ export async function GET() {
       console.error("Appwrite table list failed", { status: response.status });
       return jsonError("تعذّر تحميل الطاولات من قاعدة البيانات.", 502);
     }
-    return NextResponse.json({ rows: (payload.rows ?? []) as TableRow[] });
+    const rows = Array.isArray(payload.rows) ? payload.rows.map((raw: unknown) => {
+      const row = raw as Record<string, unknown>;
+      const data = row.data && typeof row.data === "object" ? row.data as Record<string, unknown> : {};
+      return { ...row, ...data } as TableRow;
+    }) : [];
+    return NextResponse.json({ rows });
   } catch (error) {
     console.error("Admin table list failed", error instanceof Error ? error.message : "unknown");
     return jsonError("حدث خطأ أثناء تحميل الطاولات.", 500);
@@ -95,7 +104,7 @@ export async function POST(request: Request) {
         method: "POST",
         body: JSON.stringify({
           rowId: randomUUID(),
-          data: { table_number: tableNumber, label, qr_token: newQrToken(), is_active: true },
+          data: { tenant_id: admin.tenantId, branch_id: admin.branchIds[0], table_number: tableNumber, label, qr_token: newQrToken(), is_active: true },
           permissions: [],
         }),
       },
@@ -139,6 +148,13 @@ export async function PATCH(request: Request) {
   if (Object.keys(data).length === 0) return jsonError("لا توجد تغييرات للحفظ.");
 
   try {
+    const current = await callAppwrite(`/tablesdb/${DATABASE_ID}/tables/${TABLE_ID}/rows/${encodeURIComponent(body.id)}`);
+    const currentData = current.payload.data && typeof current.payload.data === "object"
+      ? current.payload.data as Record<string, unknown>
+      : current.payload as Record<string, unknown>;
+    if (!current.response.ok || currentData.tenant_id !== admin.tenantId || typeof currentData.branch_id !== "string" || !admin.branchIds.includes(currentData.branch_id)) {
+      return jsonError("الطاولة غير موجودة.", 404);
+    }
     const { response, payload } = await callAppwrite(
       `/tablesdb/${DATABASE_ID}/tables/${TABLE_ID}/rows/${encodeURIComponent(body.id)}`,
       { method: "PATCH", body: JSON.stringify({ data }) },
