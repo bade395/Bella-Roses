@@ -38,7 +38,8 @@ function localDay(value: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("reports.read"))) return fail("غير مصرح.", 401);
+  const staff = await getStaffUser("reports.read");
+  if (!staff) return fail("غير مصرح.", 401);
   const range = Number(new URL(request.url).searchParams.get("days") ?? 7);
   if (![7, 30, 90].includes(range)) return fail("الفترة المطلوبة غير صالحة.");
 
