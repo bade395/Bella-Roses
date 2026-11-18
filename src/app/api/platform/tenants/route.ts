@@ -11,7 +11,8 @@ const PAGE_SIZE = 50;
 export async function GET(request: Request) {
   try {
     const actor = await requirePlatformOwner();
-    const endpoint = (APPWRITE_ENDPOINT ?? "").replace(/\\/+$/, "");
+    let endpoint = APPWRITE_ENDPOINT ?? "";
+    while (endpoint.endsWith("/")) endpoint = endpoint.slice(0, -1);
     const projectId = APPWRITE_PROJECT_ID;
     const apiKey = process.env.APPWRITE_API_KEY;
     if (!endpoint || !projectId || !apiKey) {
