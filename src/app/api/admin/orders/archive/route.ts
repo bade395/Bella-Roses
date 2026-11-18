@@ -31,7 +31,8 @@ async function call(path: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("orders.read"))) return fail("غير مصرح.", 401);
+  const staff = await getStaffUser("orders.read");
+  if (!staff) return fail("غير مصرح.", 401);
   const params = new URL(request.url).searchParams;
   const status = params.get("status") ?? "all";
   const limit = Math.min(100, Math.max(10, Number(params.get("limit")) || 50));
