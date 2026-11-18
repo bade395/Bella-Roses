@@ -1,7 +1,7 @@
 # Stage 7.2 — Platform Foundation Implementation
 
 **Branch:** `feat/bade3-stage-7-platform-foundation`  
-**Status:** Implementation candidate; review and deployment pending  
+**Status:** Foundation merged; shared-database adapter and integration are being implemented in a follow-up change  
 **Base:** Approved bade3 7.1 specification
 
 ## Delivered in this change
@@ -15,7 +15,7 @@
 ## Required deployment configuration
 
 - `BADE3_PLATFORM_OWNER_USER_IDS`: comma-separated Appwrite user IDs for Platform Owner accounts.
-- `BADE3_CORE_DATABASE_ID`: defaults to `bade3_core`.
+- `BADE3_CORE_DATABASE_ID`: defaults to `NEXT_PUBLIC_APPWRITE_DATABASE_ID` or `bella_roses` for the current free-tier shared deployment.
 - `BADE3_AUDIT_EVENTS_TABLE_ID`: defaults to `audit_events`.
 - Existing server-only `APPWRITE_API_KEY`, `APPWRITE_ENDPOINT`, and `APPWRITE_PROJECT_ID`.
 
@@ -23,9 +23,9 @@ Do not place any of these server-only values behind a `NEXT_PUBLIC_` prefix.
 
 ## Important integration boundary
 
-The live Appwrite project was inspected before implementation. It currently exposes the legacy `bella_roses` database and `menu_images` bucket; no `bade3_core` database or platform tables were confirmed. Therefore this PR deliberately does **not** write to, create, rename, or migrate production Appwrite resources.
+The free-tier deployment uses the existing `bella_roses` database as a shared physical database. Stage 7 provisioned platform control-plane tables additively, with row security enabled and no public table permissions, and added nullable `tenant_id`/`branch_id` ownership fields to the legacy catalog/order tables. Existing Bella Roses records were backfilled to the first tenant and main branch. The primary domain remains pending verification and inactive until approved by the Platform Owner.
 
-The new tenant resolver is a typed server-side contract. A production Appwrite directory adapter and platform API routes must be connected only after the `bade3_core` database, verified-domain indexes, and platform tables have been provisioned and checked. Until then, existing Bella Roses routes remain legacy single-tenant routes and must not be represented as multi-tenant isolated.
+A server-side Appwrite tenant directory adapter and audited Platform Owner tenant-list API are being added in the shared-database integration PR. Existing customer routes remain single-tenant until each route is explicitly converted to trusted tenant context and tested. Do not enable a second tenant before all relevant routes are scoped.
 
 ## Acceptance gates before Stage 8
 

@@ -4,7 +4,7 @@ import { getStaffUser } from "@/lib/staff-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const DB = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
+const DB = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
 const ARCHIVED = ["served", "cancelled"];
 
 function fail(message: string, status = 400) { return NextResponse.json({ error: message }, { status }); }
@@ -31,7 +31,8 @@ async function call(path: string) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("orders.read"))) return fail("غير مصرح.", 401);
+  const staff = await getStaffUser("orders.read");
+  if (!staff) return fail("غير مصرح.", 401);
   const params = new URL(request.url).searchParams;
   const status = params.get("status") ?? "all";
   const limit = Math.min(100, Math.max(10, Number(params.get("limit")) || 50));
@@ -40,6 +41,8 @@ export async function GET(request: Request) {
 
   try {
     const queries = [
+      q({ method: "equal", attribute: "tenant_id", values: [staff.tenantId] }),
+      q({ method: "equal", attribute: "branch_id", values: staff.branchIds }),
       q({ method: "equal", attribute: "status", values: status === "all" ? ARCHIVED : [status] }),
       q({ method: "orderDesc", attribute: "$createdAt" }),
       q({ method: "limit", values: [limit] }),
@@ -47,7 +50,7 @@ export async function GET(request: Request) {
     ];
     const [orders, tables] = await Promise.all([
       call(`/tablesdb/${DB}/tables/orders/rows?${queries.join("&")}`),
-      call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "limit", values: [100] })}`),
+      call(`/tablesdb/${DB}/tables/restaurant_tables/rows?${q({ method: "equal", attribute: "tenant_id", values: [staff.tenantId] })}&${q({ method: "equal", attribute: "branch_id", values: staff.branchIds })}&${q({ method: "limit", values: [100] })}`),
     ]);
     if (!orders.response.ok || !tables.response.ok) throw new Error("ARCHIVE_READ");
     const rows = normalizeRows(orders.payload.rows);

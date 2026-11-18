@@ -1,10 +1,10 @@
 # bade3 7.1 — Logical Database Schema
 
-**Status:** Approved logical design; physical schema pending capability validation  
-**Proposed database ID:** `bade3_core`  
-**Legacy database:** `bella_roses` (retain until an approved migration)
+**Status:** Approved logical design; current physical deployment uses the free-tier shared database  
+**Current database ID:** `bella_roses`  
+**Future:** Tenant storage placement supports moving a tenant to a dedicated database/project when commercially justified.
 
-> This catalog defines the target logical model. It does not claim that these tables or indexes already exist. Before provisioning, validate attribute types, required flags, sizes, index limits, uniqueness support, and query constraints against the deployed Appwrite TablesDB version.
+> This catalog defines the target logical model. Some Stage 7 platform tables and tenant ownership columns have now been provisioned additively in `bella_roses`; see `docs/bade3-free-tier-live-schema.md` for the verified live inventory. Other modules remain planned and must be provisioned only as their application features are implemented.
 
 ## 1. Data ownership conventions
 

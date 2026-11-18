@@ -6,7 +6,7 @@ import { getStaffUser } from "@/lib/staff-permissions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
+const DATABASE_ID = process.env.BADE3_CORE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "bella_roses";
 const TABLES = { categories: "categories", products: "products" } as const;
 type Kind = keyof typeof TABLES;
 
@@ -72,23 +72,31 @@ function handleError(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("menu.manage"))) return jsonError("غير مصرح.", 401);
+  const admin = await getStaffUser("menu.manage");
+  if (!admin) return jsonError("غير مصرح.", 401);
   const { searchParams } = new URL(request.url);
   const kind = searchParams.get("kind");
   if (!validKind(kind)) return jsonError("نوع البيانات غير صالح.");
   try {
-    const query = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
+    const query = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "tenant_id", values: [admin.tenantId] }));
+    const limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
     const result = await appwrite(
-      `/tablesdb/${DATABASE_ID}/tables/${TABLES[kind]}/rows?queries[]=${query}`
+      `/tablesdb/${DATABASE_ID}/tables/${TABLES[kind]}/rows?queries[]=${query}&queries[]=${limit}`
     );
-    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+    const rows = Array.isArray(result.rows) ? result.rows.map((raw) => {
+      const row = raw as Record<string, unknown>;
+      const data = row.data && typeof row.data === "object" ? row.data as Record<string, unknown> : {};
+      return { ...row, ...data };
+    }) : [];
+    return NextResponse.json({ ...result, rows }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return handleError(error);
   }
 }
 
 export async function POST(request: Request) {
-  if (!(await requireAdmin(request))) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
+  const admin = await requireAdmin(request);
+  if (!admin) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return jsonError("بيانات الطلب غير صالحة."); }
   const kind = body.kind;
@@ -100,6 +108,7 @@ export async function POST(request: Request) {
     const nameEn = cleanText(body.name_en, 120, true);
     if (!nameAr || !nameEn) return jsonError("اسم التصنيف بالعربية والإنجليزية مطلوب (حتى 120 حرفًا).");
     data = {
+      tenant_id: admin.tenantId,
       name_ar: nameAr,
       name_en: nameEn,
       description_ar: cleanText(body.description_ar, 2000),
@@ -115,8 +124,10 @@ export async function POST(request: Request) {
     if (!categoryId || !nameAr || !nameEn) return jsonError("التصنيف والاسم بالعربية والإنجليزية حقول مطلوبة.");
     if (!Number.isFinite(price) || price < 0 || price > 1000000) return jsonError("أدخل سعرًا صحيحًا غير سالب.");
     const category = await appwrite(`/tablesdb/${DATABASE_ID}/tables/categories/rows/${encodeURIComponent(categoryId)}`);
-    if (!category.$id || category.is_active === false) return jsonError("التصنيف المحدد غير موجود أو غير نشط.");
+    const categoryData = category.data && typeof category.data === "object" ? category.data as Record<string, unknown> : category;
+    if (!category.$id || categoryData.tenant_id !== admin.tenantId || categoryData.is_active === false) return jsonError("التصنيف المحدد غير موجود أو غير نشط.");
     data = {
+      tenant_id: admin.tenantId,
       category_id: categoryId,
       name_ar: nameAr,
       name_en: nameEn,
@@ -142,7 +153,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await requireAdmin(request))) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
+  const admin = await requireAdmin(request);
+  if (!admin) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return jsonError("بيانات الطلب غير صالحة."); }
   const kind = body.kind;
@@ -182,9 +194,13 @@ export async function PATCH(request: Request) {
   }
   if (Object.keys(data).length === 0) return jsonError("لا توجد تغييرات للحفظ.");
   try {
+    const current = await appwrite(`/tablesdb/${DATABASE_ID}/tables/${TABLES[kind]}/rows/${encodeURIComponent(id)}`);
+    const currentData = current.data && typeof current.data === "object" ? current.data as Record<string, unknown> : current;
+    if (!current.$id || currentData.tenant_id !== admin.tenantId) return jsonError("العنصر غير موجود.", 404);
     if (kind === "products" && typeof data.category_id === "string") {
       const category = await appwrite(`/tablesdb/${DATABASE_ID}/tables/categories/rows/${encodeURIComponent(data.category_id)}`);
-      if (!category.$id || category.is_active === false) return jsonError("التصنيف المحدد غير موجود أو غير نشط.");
+      const categoryData = category.data && typeof category.data === "object" ? category.data as Record<string, unknown> : category;
+      if (!category.$id || categoryData.tenant_id !== admin.tenantId || categoryData.is_active === false) return jsonError("التصنيف المحدد غير موجود أو غير نشط.");
     }
     const result = await appwrite(
       `/tablesdb/${DATABASE_ID}/tables/${TABLES[kind]}/rows/${encodeURIComponent(id)}`,
@@ -197,13 +213,17 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await requireAdmin(request))) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
+  const admin = await requireAdmin(request);
+  if (!admin) return jsonError("غير مصرح أو مصدر الطلب غير موثوق.", 403);
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return jsonError("بيانات الطلب غير صالحة."); }
   const kind = body.kind;
   const id = cleanText(body.id, 36, true);
   if (!validKind(kind) || !id) return jsonError("بيانات العنصر غير صالحة.");
   try {
+    const current = await appwrite(`/tablesdb/${DATABASE_ID}/tables/${TABLES[kind]}/rows/${encodeURIComponent(id)}`);
+    const currentData = current.data && typeof current.data === "object" ? current.data as Record<string, unknown> : current;
+    if (!current.$id || currentData.tenant_id !== admin.tenantId) return jsonError("العنصر غير موجود.", 404);
     // Archive instead of hard-delete to preserve references and order history.
     const field = kind === "categories" ? "is_active" : "is_available";
     const result = await appwrite(
