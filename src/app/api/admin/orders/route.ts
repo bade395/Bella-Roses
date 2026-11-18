@@ -27,7 +27,8 @@ async function call(path: string, init: RequestInit = {}) {
 function q(value: unknown) { return `queries[]=${encodeURIComponent(JSON.stringify(value))}`; }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("orders.read"))) return fail("غير مصرح أو لا تملك صلاحية قراءة الطلبات.", 403);
+  const staff = await getStaffUser("orders.read");
+  if (!staff) return fail("غير مصرح أو لا تملك صلاحية قراءة الطلبات.", 403);
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (id) {
