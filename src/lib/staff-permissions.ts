@@ -80,7 +80,20 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   if (!user.$id) return null;
 
   const incomingHeaders = await requestHeaders();
-  const tenant = await resolveTenantForHost(incomingHeaders.get("host"));
+  // Vercel may expose the deployment host in `host` while preserving the
+  // original custom domain in `x-forwarded-host`. Resolve both strictly
+  // against the verified tenant-domain directory; never trust an unverified host.
+  const hostCandidates = [incomingHeaders.get("host"), incomingHeaders.get("x-forwarded-host")]
+    .filter((value): value is string => Boolean(value));
+  let tenant = null;
+  for (const host of [...new Set(hostCandidates)]) {
+    try {
+      tenant = await resolveTenantForHost(host);
+      if (tenant) break;
+    } catch {
+      // A malformed proxy host must not prevent checking the verified host fallback.
+    }
+  }
   if (!tenant) return null;
   const tenantMembership = await getActiveTenantMembership(tenant.id, user.$id);
   if (!tenantMembership || !isStaffRole(tenantMembership.role)) return null;
