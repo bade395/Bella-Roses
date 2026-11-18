@@ -9,14 +9,14 @@ const ENV_KEYS = [
   "NEXT_PUBLIC_APPWRITE_DATABASE_ID",
 ];
 
-function withEnv(values, run) {
+async function withEnv(values, run) {
   const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   for (const key of ENV_KEYS) {
     if (Object.hasOwn(values, key)) process.env[key] = values[key];
     else delete process.env[key];
   }
   try {
-    return run();
+    return await run();
   } finally {
     for (const key of ENV_KEYS) {
       if (previous[key] === undefined) delete process.env[key];
