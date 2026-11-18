@@ -72,7 +72,8 @@ function handleError(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!(await getStaffUser("menu.manage"))) return jsonError("غير مصرح.", 401);
+  const admin = await getStaffUser("menu.manage");
+  if (!admin) return jsonError("غير مصرح.", 401);
   const { searchParams } = new URL(request.url);
   const kind = searchParams.get("kind");
   if (!validKind(kind)) return jsonError("نوع البيانات غير صالح.");
