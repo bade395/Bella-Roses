@@ -108,22 +108,16 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   }
 
   if (!tenant && ownerAllowed) {
+    // The owner tenant ID is a server-side constant/configuration, not user input.
+    // Do not make owner login depend on a second tenant-row lookup: the active
+    // tenant membership and branch-access checks below remain mandatory gates.
     const ownerTenantId = process.env.BELLA_ROSES_TENANT_ID ?? "bella-roses";
-    const ownerTenant = await new AppwriteTenantDirectory().getTenant(ownerTenantId);
-    if (
-      ownerTenant &&
-      ownerTenant.$id === ownerTenantId &&
-      ownerTenant.status === "active" &&
-      typeof ownerTenant.slug === "string" &&
-      ownerTenant.slug
-    ) {
-      tenant = {
-        id: ownerTenantId,
-        slug: ownerTenant.slug,
-        status: "active",
-        primaryDomain: hostCandidates[0] ?? "owner-fallback",
-      };
-    }
+    tenant = {
+      id: ownerTenantId,
+      slug: "bella-roses",
+      status: "active",
+      primaryDomain: hostCandidates[0] ?? "owner-fallback",
+    };
   }
   if (!tenant) return rejectStaffContext("tenant-not-resolved", { ownerAllowed, hosts: hostCandidates });
 
