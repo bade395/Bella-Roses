@@ -1,5 +1,5 @@
 import { cookies, headers as requestHeaders } from "next/headers";
-import { getActiveTenantMembership, getTenantBranchAccess, resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
+import { AppwriteTenantDirectory, getActiveTenantMembership, getTenantBranchAccess, resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
 import {
   ADMIN_SESSION_COOKIE,
   APPWRITE_ENDPOINT,
@@ -92,6 +92,28 @@ export async function getStaffContext(): Promise<StaffContext | null> {
       if (tenant) break;
     } catch {
       // A malformed proxy host must not prevent checking the verified host fallback.
+    }
+  }
+  // The allowlisted Bella owner may sign in from Vercel preview/forwarded hosts
+  // that do not resolve through the verified-domain directory. Use this project's
+  // fixed tenant only for the allowlisted owner, while still requiring active
+  // membership and branch access below.
+  if (!tenant && isAllowedAdmin(user.$id)) {
+    const ownerTenantId = process.env.BELLA_ROSES_TENANT_ID ?? "bella-roses";
+    const ownerTenant = await new AppwriteTenantDirectory().getTenant(ownerTenantId);
+    if (
+      ownerTenant &&
+      ownerTenant.$id === ownerTenantId &&
+      ownerTenant.status === "active" &&
+      typeof ownerTenant.slug === "string" &&
+      ownerTenant.slug
+    ) {
+      tenant = {
+        id: ownerTenantId,
+        slug: ownerTenant.slug,
+        status: "active",
+        primaryDomain: hostCandidates[0] ?? "owner-fallback",
+      };
     }
   }
   if (!tenant) return null;
