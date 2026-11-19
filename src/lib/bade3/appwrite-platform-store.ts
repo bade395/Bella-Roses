@@ -25,7 +25,20 @@ type AppwriteList<T> = { rows?: AppwriteRow<T>[]; total?: number };
 /** Accept raw TablesDB REST rows and normalized operator rows. */
 function rowData<T>(row: AppwriteRow<T>): T {
   if (row.data && typeof row.data === "object") return row.data;
-  const { $id: _id, $sequence: _sequence, $tableId: _tableId, $databaseId: _databaseId, $createdAt: _createdAt, $updatedAt: _updatedAt, $permissions: _permissions, data: _data, ...columns } = row as AppwriteRow<T> & Record<string, unknown>;
+
+  const columns = { ...row } as Record<string, unknown>;
+  for (const key of [
+    "$id",
+    "$sequence",
+    "$tableId",
+    "$databaseId",
+    "$createdAt",
+    "$updatedAt",
+    "$permissions",
+    "data",
+  ]) {
+    delete columns[key];
+  }
   return columns as T;
 }
 type DomainData = {
