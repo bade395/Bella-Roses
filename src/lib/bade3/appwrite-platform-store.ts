@@ -78,18 +78,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 function queryParam(query: Record<string, unknown>) {
   const method = typeof query.method === "string" ? query.method : "";
   if (!method) throw new Error("INVALID_APPWRITE_QUERY");
-  const attribute = typeof query.attribute === "string" ? query.attribute : "";
-  const values = Array.isArray(query.values) ? query.values : [];
 
-  // Appwrite TablesDB expects Query helper strings (e.g. equal("status", ["active"])),
-  // not JSON objects. JSON-shaped queries are silently unusable for filtering and
-  // caused active tenant memberships to come back empty during admin authorization.
-  const expression = attribute
-    ? ["orderAsc", "orderDesc", "isNull", "isNotNull"].includes(method)
-      ? `${method}(${JSON.stringify(attribute)})`
-      : `${method}(${JSON.stringify(attribute)}, ${JSON.stringify(values)})`
-    : `${method}(${values.map((value) => JSON.stringify(value)).join(", ")})`;
-  return `queries[]=${encodeURIComponent(expression)}`;
+  // The Appwrite REST API expects each queries[] value to be a JSON-encoded
+  // Query object. Query.equal() serializes to this same representation.
+  return `queries[]=${encodeURIComponent(JSON.stringify(query))}`;
 }
 
 async function listRows<T>(
