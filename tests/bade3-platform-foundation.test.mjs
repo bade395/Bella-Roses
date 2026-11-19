@@ -7,6 +7,7 @@ import {
 import {
   assertSameTenant,
   authorizeTenantOperation,
+  filterActiveTenantBranchAccess,
 } from "../src/lib/bade3/tenant-authorization.ts";
 
 test("normalizes hostnames and rejects URL/path injection", () => {
@@ -67,4 +68,29 @@ test("tenant authorization rejects cross-tenant, inactive and unassigned access"
 test("cross-tenant parent-child links fail closed", () => {
   assert.doesNotThrow(() => assertSameTenant("tenant-a", "tenant-a"));
   assert.throws(() => assertSameTenant("tenant-a", "tenant-b"), /CROSS_TENANT_RESOURCE/);
+});
+
+test("branch access is limited to active branches owned by the same tenant and user", () => {
+  const accessRows = [
+    { tenantId: "tenant-a", userId: "user-a", branchId: "branch-active", status: "active", role: "manager" },
+    { tenantId: "tenant-a", userId: "user-a", branchId: "branch-inactive", status: "active", role: "cashier" },
+    { tenantId: "tenant-a", userId: "user-a", branchId: "branch-other-tenant", status: "active", role: "owner" },
+    { tenantId: "tenant-a", userId: "user-b", branchId: "branch-active", status: "active", role: "owner" },
+    { tenantId: "tenant-a", userId: "user-a", branchId: "branch-revoked", status: "revoked", role: "manager" },
+  ];
+  const branches = [
+    { id: "branch-active", tenantId: "tenant-a", status: "active" },
+    { id: "branch-inactive", tenantId: "tenant-a", status: "inactive" },
+    { id: "branch-other-tenant", tenantId: "tenant-b", status: "active" },
+    { id: "branch-revoked", tenantId: "tenant-a", status: "active" },
+  ];
+  assert.deepEqual(
+    filterActiveTenantBranchAccess("tenant-a", "user-a", accessRows, branches),
+    [{ branchId: "branch-active", role: "manager" }],
+  );
+});
+
+test("branch access returns no assignments when tenant or user context is missing", () => {
+  assert.deepEqual(filterActiveTenantBranchAccess("", "user-a", [], []), []);
+  assert.deepEqual(filterActiveTenantBranchAccess("tenant-a", "", [], []), []);
 });

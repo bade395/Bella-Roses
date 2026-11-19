@@ -5,6 +5,7 @@ import {
   type ResolvedTenant,
   type TenantDirectory,
 } from "./tenant-context";
+import { filterActiveTenantBranchAccess } from "./tenant-authorization";
 
 const DATABASE_ID =
   process.env.BADE3_CORE_DATABASE_ID ??
@@ -252,13 +253,37 @@ export async function getTenantOperationalRow<T extends Record<string, unknown>>
 
 export async function getTenantBranchAccess(tenantId: string, userId: string) {
   if (!tenantId || !userId) return [];
-  const rows = await listRows<Record<string, unknown>>("branch_staff_access", [
-    { method: "equal", attribute: "tenant_id", values: [tenantId] },
-    { method: "equal", attribute: "user_id", values: [userId] },
-    { method: "equal", attribute: "status", values: ["active"] },
-  ], 100);
-  return rows
-    .map((row) => rowData(row))
-    .filter((data) => data.tenant_id === tenantId && typeof data.branch_id === "string")
-    .map((data) => ({ branchId: String(data.branch_id), role: String(data.role ?? "") }));
+  const [accessRows, branchRows] = await Promise.all([
+    listRows<Record<string, unknown>>("branch_staff_access", [
+      { method: "equal", attribute: "tenant_id", values: [tenantId] },
+      { method: "equal", attribute: "user_id", values: [userId] },
+      { method: "equal", attribute: "status", values: ["active"] },
+    ], 100),
+    listRows<BranchData>("branches", [
+      { method: "equal", attribute: "tenant_id", values: [tenantId] },
+      { method: "equal", attribute: "status", values: ["active"] },
+    ], 100),
+  ]);
+  return filterActiveTenantBranchAccess(
+    tenantId,
+    userId,
+    accessRows.map((row) => {
+      const data = rowData(row);
+      return {
+        tenantId: String(data.tenant_id ?? ""),
+        userId: String(data.user_id ?? ""),
+        branchId: String(data.branch_id ?? ""),
+        status: String(data.status ?? ""),
+        role: String(data.role ?? ""),
+      };
+    }),
+    branchRows.map((row) => {
+      const data = rowData(row);
+      return {
+        id: row.$id,
+        tenantId: String(data.tenant_id ?? ""),
+        status: data.status === "active" ? "active" : "inactive",
+      };
+    }),
+  );
 }
