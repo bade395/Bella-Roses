@@ -38,3 +38,36 @@ export function assertSameTenant(parentTenantId: string, childTenantId: string):
     throw new Error("CROSS_TENANT_RESOURCE");
   }
 }
+
+export type BranchAccessRecord = {
+  tenantId: string;
+  userId: string;
+  branchId: string;
+  status: string;
+  role: string;
+};
+
+export function filterActiveTenantBranchAccess(
+  tenantId: string,
+  userId: string,
+  accessRows: readonly BranchAccessRecord[],
+  branches: readonly BranchRecord[],
+): Array<{ branchId: string; role: string }> {
+  if (!tenantId || !userId) return [];
+  const activeBranchIds = new Set(
+    branches
+      .filter((branch) => branch.tenantId === tenantId && branch.status === "active")
+      .map((branch) => branch.id),
+  );
+  const unique = new Map<string, { branchId: string; role: string }>();
+  for (const access of accessRows) {
+    if (
+      access.tenantId !== tenantId ||
+      access.userId !== userId ||
+      access.status !== "active" ||
+      !activeBranchIds.has(access.branchId)
+    ) continue;
+    unique.set(access.branchId, { branchId: access.branchId, role: access.role });
+  }
+  return [...unique.values()];
+}
