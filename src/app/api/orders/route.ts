@@ -49,7 +49,7 @@ function text(value: unknown, max: number) {
 
 async function createOrderNumber(tenantId: string) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const candidate = `BELLA-${randomInt(100000, 1000000)}`;
+    const candidate = `ORD-${randomInt(100000, 1000000)}`;
     const existing = await appwrite(`/tablesdb/${DATABASE_ID}/tables/orders/rows?${queryParam({ method: "equal", attribute: "tenant_id", values: [tenantId] })}&${queryParam({ method: "equal", attribute: "order_number", values: [candidate] })}&${queryParam({ method: "limit", values: [1] })}`);
     if (!existing.response.ok) throw new Error("ORDER_NUMBER_CHECK");
     if (!Array.isArray(existing.payload.rows) || existing.payload.rows.length === 0) return candidate;
