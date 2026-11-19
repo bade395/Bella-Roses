@@ -19,8 +19,28 @@ const TENANT_TABLES = new Set([
   "order_items",
 ]);
 
-type AppwriteRow<T> = { $id: string; data: T };
+type AppwriteRow<T> = { $id: string; data?: T } & Partial<T>;
 type AppwriteList<T> = { rows?: AppwriteRow<T>[]; total?: number };
+
+/** Accept raw TablesDB REST rows and normalized operator rows. */
+function rowData<T>(row: AppwriteRow<T>): T {
+  if (row.data && typeof row.data === "object") return row.data;
+
+  const columns = { ...row } as Record<string, unknown>;
+  for (const key of [
+    "$id",
+    "$sequence",
+    "$tableId",
+    "$databaseId",
+    "$createdAt",
+    "$updatedAt",
+    "$permissions",
+    "data",
+  ]) {
+    delete columns[key];
+  }
+  return columns as T;
+}
 type DomainData = {
   tenant_id?: string;
   domain?: string;
@@ -107,14 +127,14 @@ export class AppwriteTenantDirectory implements TenantDirectory {
       { method: "equal", attribute: "verification_status", values: ["verified"] },
       { method: "equal", attribute: "is_active", values: [true] },
     ], 1);
-    return rows[0]?.data ?? null;
+    return rows[0] ? rowData(rows[0]) : null;
   }
 
   async getTenant(tenantId: string): Promise<TenantData | null> {
     const row = await request<AppwriteRow<TenantData>>(
       `/tablesdb/${encodeURIComponent(DATABASE_ID)}/tables/tenants/rows/${encodeURIComponent(tenantId)}`,
     ).catch(() => null);
-    return row?.data ? { ...row.data, $id: row.$id } : null;
+    return row ? { ...rowData(row), $id: row.$id } : null;
   }
 }
 
@@ -133,7 +153,7 @@ export async function getActiveTenantMembership(
     { method: "equal", attribute: "user_id", values: [userId] },
     { method: "equal", attribute: "status", values: ["active"] },
   ], 1);
-  const member = rows[0]?.data;
+  const member = rows[0] ? rowData(rows[0]) : null;
   if (!member?.tenant_id || !member.user_id || !member.role) return null;
   return {
     tenantId: member.tenant_id,
@@ -151,9 +171,9 @@ export async function isActiveTenantBranch(
     `/tablesdb/${encodeURIComponent(DATABASE_ID)}/tables/branches/rows/${encodeURIComponent(branchId)}`,
   ).catch(() => null);
   return Boolean(
-    branch?.data &&
-    branch.data.tenant_id === tenantId &&
-    branch.data.status === "active",
+    branch &&
+    rowData(branch).tenant_id === tenantId &&
+    rowData(branch).status === "active",
   );
 }
 
@@ -198,8 +218,8 @@ export async function getTenantMenu(tenantId: string) {
     ]),
   ]);
   return {
-    categories: categories.map((row) => ({ $id: row.$id, ...row.data })),
-    products: products.map((row) => ({ $id: row.$id, ...row.data })),
+    categories: categories.map((row) => ({ $id: row.$id, ...rowData(row) })),
+    products: products.map((row) => ({ $id: row.$id, ...rowData(row) })),
   };
 }
 
@@ -211,7 +231,7 @@ export async function findTenantTableByToken(tenantId: string, token: string) {
     { method: "equal", attribute: "is_active", values: [true] },
   ], 1);
   const row = rows[0];
-  return row ? { $id: row.$id, ...row.data } as Record<string, unknown> & { $id: string } : null;
+  return row ? { $id: row.$id, ...rowData(row) } as Record<string, unknown> & { $id: string } : null;
 }
 
 export async function getTenantOperationalRow<T extends Record<string, unknown>>(
@@ -224,8 +244,10 @@ export async function getTenantOperationalRow<T extends Record<string, unknown>>
   const row = await request<AppwriteRow<T>>(
     `/tablesdb/${encodeURIComponent(DATABASE_ID)}/tables/${encodeURIComponent(tableId)}/rows/${encodeURIComponent(rowId)}`,
   ).catch(() => null);
-  if (!row?.data || row.data.tenant_id !== tenantId) return null;
-  return { $id: row.$id, ...row.data } as T & { $id: string };
+  if (!row) return null;
+  const data = rowData(row);
+  if (data.tenant_id !== tenantId) return null;
+  return { $id: row.$id, ...data } as T & { $id: string };
 }
 
 export async function getTenantBranchAccess(tenantId: string, userId: string) {
@@ -236,7 +258,7 @@ export async function getTenantBranchAccess(tenantId: string, userId: string) {
     { method: "equal", attribute: "status", values: ["active"] },
   ], 100);
   return rows
-    .map((row) => row.data)
+    .map((row) => rowData(row))
     .filter((data) => data.tenant_id === tenantId && typeof data.branch_id === "string")
     .map((data) => ({ branchId: String(data.branch_id), role: String(data.role ?? "") }));
 }
