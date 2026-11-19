@@ -1,11 +1,11 @@
 import "server-only";
 
 import {
-  filterActiveTenantBranchAccess,
   resolveTenantFromHost,
   type ResolvedTenant,
   type TenantDirectory,
 } from "./tenant-context";
+import { filterActiveTenantBranchAccess } from "./tenant-authorization";
 
 const DATABASE_ID =
   process.env.BADE3_CORE_DATABASE_ID ??
