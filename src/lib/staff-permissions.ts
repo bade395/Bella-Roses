@@ -53,17 +53,28 @@ function isStaffRole(value: string): value is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(value);
 }
 
+function rejectStaffContext(stage: string, details: Record<string, unknown> = {}): null {
+  console.error("[staff-context] rejected", { stage, ...details });
+  return null;
+}
+
 /**
  * Resolves the signed-in user's role from Appwrite Team membership.
  * The existing immutable admin allowlist remains the owner bootstrap path,
  * so enabling the Team feature cannot lock out the current owner.
  */
 export async function getStaffContext(): Promise<StaffContext | null> {
-  if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !ADMIN_SESSION_COOKIE) return null;
+  if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !ADMIN_SESSION_COOKIE) {
+    return rejectStaffContext("appwrite-config-missing", {
+      hasEndpoint: Boolean(APPWRITE_ENDPOINT),
+      hasProjectId: Boolean(APPWRITE_PROJECT_ID),
+      hasCookieName: Boolean(ADMIN_SESSION_COOKIE),
+    });
+  }
 
   const cookieStore = await cookies();
   const sessionSecret = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-  if (!sessionSecret) return null;
+  if (!sessionSecret) return rejectStaffContext("session-cookie-missing", { cookieName: ADMIN_SESSION_COOKIE });
 
   const headers = {
     "X-Appwrite-Project": APPWRITE_PROJECT_ID,
@@ -74,15 +85,13 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     headers,
     cache: "no-store",
   });
-  if (!userResponse.ok) return null;
+  if (!userResponse.ok) return rejectStaffContext("appwrite-account-rejected", { status: userResponse.status });
 
   const user = (await userResponse.json()) as AppwriteUser;
-  if (!user.$id) return null;
+  if (!user.$id) return rejectStaffContext("appwrite-account-id-missing");
 
+  const ownerAllowed = isAllowedAdmin(user.$id);
   const incomingHeaders = await requestHeaders();
-  // Vercel may expose the deployment host in `host` while preserving the
-  // original custom domain in `x-forwarded-host`. Resolve both strictly
-  // against the verified tenant-domain directory; never trust an unverified host.
   const hostCandidates = [incomingHeaders.get("host"), incomingHeaders.get("x-forwarded-host")]
     .filter((value): value is string => Boolean(value));
   let tenant = null;
@@ -90,15 +99,15 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     try {
       tenant = await resolveTenantForHost(host);
       if (tenant) break;
-    } catch {
-      // A malformed proxy host must not prevent checking the verified host fallback.
+    } catch (error) {
+      console.error("[staff-context] host resolution failed", {
+        host,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
-  // The allowlisted Bella owner may sign in from Vercel preview/forwarded hosts
-  // that do not resolve through the verified-domain directory. Use this project's
-  // fixed tenant only for the allowlisted owner, while still requiring active
-  // membership and branch access below.
-  if (!tenant && isAllowedAdmin(user.$id)) {
+
+  if (!tenant && ownerAllowed) {
     const ownerTenantId = process.env.BELLA_ROSES_TENANT_ID ?? "bella-roses";
     const ownerTenant = await new AppwriteTenantDirectory().getTenant(ownerTenantId);
     if (
@@ -116,14 +125,23 @@ export async function getStaffContext(): Promise<StaffContext | null> {
       };
     }
   }
-  if (!tenant) return null;
+  if (!tenant) return rejectStaffContext("tenant-not-resolved", { ownerAllowed, hosts: hostCandidates });
+
   const tenantMembership = await getActiveTenantMembership(tenant.id, user.$id);
-  if (!tenantMembership || !isStaffRole(tenantMembership.role)) return null;
+  if (!tenantMembership || !isStaffRole(tenantMembership.role)) {
+    return rejectStaffContext("tenant-membership-missing-or-invalid", {
+      tenantId: tenant.id,
+      ownerAllowed,
+      membershipFound: Boolean(tenantMembership),
+      role: tenantMembership?.role ?? null,
+    });
+  }
+
   const branchAccess = await getTenantBranchAccess(tenant.id, user.$id);
   const branchIds = branchAccess.map((entry) => entry.branchId);
-  if (branchIds.length === 0) return null;
+  if (branchIds.length === 0) return rejectStaffContext("branch-access-empty", { tenantId: tenant.id, ownerAllowed });
 
-  if (isAllowedAdmin(user.$id)) {
+  if (ownerAllowed) {
     return {
       id: user.$id,
       email: user.email ?? "",
@@ -137,7 +155,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   }
 
   const teamId = process.env.APPWRITE_STAFF_TEAM_ID ?? "bella-roses-staff";
-  if (!teamId) return null;
+  if (!teamId) return rejectStaffContext("staff-team-id-missing");
 
   const query = encodeURIComponent(JSON.stringify({
     method: "equal",
@@ -148,7 +166,9 @@ export async function getStaffContext(): Promise<StaffContext | null> {
     `${APPWRITE_ENDPOINT}/account/memberships?queries[]=${query}`,
     { headers, cache: "no-store" },
   );
-  if (!membershipsResponse.ok) return null;
+  if (!membershipsResponse.ok) {
+    return rejectStaffContext("appwrite-team-memberships-rejected", { status: membershipsResponse.status });
+  }
 
   const payload = (await membershipsResponse.json()) as { memberships?: Membership[] };
   const membership = payload.memberships?.find(
@@ -158,10 +178,14 @@ export async function getStaffContext(): Promise<StaffContext | null> {
       entry.confirm === true &&
       Boolean(entry.joined),
   );
-  if (!membership?.$id || !Array.isArray(membership.roles)) return null;
+  if (!membership?.$id || !Array.isArray(membership.roles)) {
+    return rejectStaffContext("staff-team-membership-missing", { teamId, tenantRole: tenantMembership.role });
+  }
 
   const teamRole = membership.roles.find(isStaffRole);
-  if (!teamRole || teamRole !== tenantMembership.role) return null;
+  if (!teamRole || teamRole !== tenantMembership.role) {
+    return rejectStaffContext("staff-team-role-mismatch", { teamRole: teamRole ?? null, tenantRole: tenantMembership.role });
+  }
   const role = tenantMembership.role;
 
   return {
