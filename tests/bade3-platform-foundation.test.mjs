@@ -7,6 +7,7 @@ import {
 import {
   assertSameTenant,
   authorizeTenantOperation,
+  filterActiveTenantBranchAccess,
 } from "../src/lib/bade3/tenant-authorization.ts";
 
 test("normalizes hostnames and rejects URL/path injection", () => {
