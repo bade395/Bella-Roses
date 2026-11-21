@@ -52,7 +52,7 @@ export async function readPlatformOverview() {
  const domains=domainRows.map(row=>({id:row.$id,...data(row)}));
  const plans=planRows.map(row=>data(row));
  const subscriptions=subscriptionRows.map(row=>({id:row.$id,...data(row)}));
- const planMap=new Map(plans.map(plan=>[plan.code??"",plan.name??plan.code??"—"]));
+ const planMap=new Map(planRows.map(row=>[row.$id,data(row).name??data(row).code??"—"]));
  const tenantItems=tenants.map(tenant=>{
   const bs=branches.filter(branch=>branch.tenant_id===tenant.id);
   const ds=domains.filter(domain=>domain.tenant_id===tenant.id&&domain.is_active&&domain.verification_status==="verified");
