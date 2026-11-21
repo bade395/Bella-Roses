@@ -1,4 +1,6 @@
-import { cookies } from "next/headers";
+import { cookies, headers as requestHeaders } from "next/headers";
+import { resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
+import { PLATFORM_SUPPORT_COOKIE, verifySupportToken } from "@/lib/bade3/platform-support";
 
 export const APPWRITE_ENDPOINT = (
   process.env.APPWRITE_ENDPOINT ?? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? ""
@@ -21,11 +23,27 @@ export function isAllowedAdmin(userId: string) {
 }
 
 export async function getAdminUser() {
+  const cookieStore = await cookies();
+  const supportToken = cookieStore.get(PLATFORM_SUPPORT_COOKIE)?.value;
+  if (supportToken) {
+    const claims = verifySupportToken(supportToken, "bella-support");
+    if (!claims) return null;
+    const incoming = await requestHeaders();
+    const hosts = [incoming.get("host"), incoming.get("x-forwarded-host")]
+      .filter((value): value is string => Boolean(value));
+    for (const host of [...new Set(hosts)]) {
+      const tenant = await resolveTenantForHost(host).catch(() => null);
+      if (tenant?.id === claims.tenantId && tenant.status === "active") {
+        return { id: claims.sub, email: "", name: "BADE3 Platform Owner" };
+      }
+    }
+    return null;
+  }
+
   if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !ADMIN_SESSION_COOKIE) {
     return null;
   }
 
-  const cookieStore = await cookies();
   const sessionSecret = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
   if (!sessionSecret) return null;
 
