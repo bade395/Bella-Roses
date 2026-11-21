@@ -1,5 +1,6 @@
 import { cookies, headers as requestHeaders } from "next/headers";
-import { AppwriteTenantDirectory, getActiveTenantMembership, getTenantBranchAccess, resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
+import { AppwriteTenantDirectory, getActiveTenantBranchIds, getActiveTenantMembership, getTenantBranchAccess, resolveTenantForHost } from "@/lib/bade3/appwrite-platform-store";
+import { PLATFORM_SUPPORT_COOKIE, verifySupportToken } from "@/lib/bade3/platform-support";
 import {
   ADMIN_SESSION_COOKIE,
   APPWRITE_ENDPOINT,
@@ -73,6 +74,40 @@ export async function getStaffContext(): Promise<StaffContext | null> {
   }
 
   const cookieStore = await cookies();
+  const supportToken = cookieStore.get(PLATFORM_SUPPORT_COOKIE)?.value;
+  if (supportToken) {
+    const claims = verifySupportToken(supportToken, "bella-support");
+    if (!claims) return rejectStaffContext("platform-support-session-invalid");
+    const incoming = await requestHeaders();
+    const hosts = [incoming.get("host"), incoming.get("x-forwarded-host")]
+      .filter((value): value is string => Boolean(value));
+    let supportTenant = null;
+    for (const host of [...new Set(hosts)]) {
+      try {
+        supportTenant = await resolveTenantForHost(host);
+        if (supportTenant) break;
+      } catch (error) {
+        console.error("[staff-context] support host resolution failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    if (!supportTenant || supportTenant.id !== claims.tenantId || supportTenant.status !== "active") {
+      return rejectStaffContext("platform-support-tenant-mismatch", { tenantId: claims.tenantId });
+    }
+    const branchIds = await getActiveTenantBranchIds(supportTenant.id);
+    return {
+      id: claims.sub,
+      email: "",
+      name: "BADE3 Platform Owner",
+      role: "owner",
+      membershipId: null,
+      permissions: ROLE_PERMISSIONS.owner,
+      tenantId: supportTenant.id,
+      branchIds,
+    };
+  }
+
   const sessionSecret = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
   if (!sessionSecret) return rejectStaffContext("session-cookie-missing", { cookieName: ADMIN_SESSION_COOKIE });
 
