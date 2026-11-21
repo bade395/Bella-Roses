@@ -251,6 +251,15 @@ export async function getTenantOperationalRow<T extends Record<string, unknown>>
   return { $id: row.$id, ...data } as T & { $id: string };
 }
 
+export async function getActiveTenantBranchIds(tenantId: string): Promise<string[]> {
+  if (!tenantId) return [];
+  const rows = await listRows<BranchData>("branches", [
+    { method: "equal", attribute: "tenant_id", values: [tenantId] },
+    { method: "equal", attribute: "status", values: ["active"] },
+  ], 100);
+  return rows.map((row) => row.$id).filter(Boolean);
+}
+
 export async function getTenantBranchAccess(tenantId: string, userId: string) {
   if (!tenantId || !userId) return [];
   const [accessRows, branchRows] = await Promise.all([
