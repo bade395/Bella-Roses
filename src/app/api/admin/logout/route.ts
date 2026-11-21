@@ -5,6 +5,7 @@ import {
   APPWRITE_PROJECT_ID,
 } from "@/lib/admin-auth";
 import { cookies } from "next/headers";
+import { PLATFORM_SUPPORT_COOKIE } from "@/lib/bade3/platform-support";
 
 export const runtime = "nodejs";
 
@@ -35,5 +36,6 @@ export async function POST() {
       maxAge: 0,
     });
   }
+  response.cookies.set(PLATFORM_SUPPORT_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
   return response;
 }
